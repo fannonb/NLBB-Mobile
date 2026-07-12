@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { AuthScreenLayout, NLBBButton, NLBBInput, NLBBCard } from '../../components/ui';
-import { ColorPalette, Fonts, Radius } from '../../constants/theme';
+import { ColorPalette, Fonts } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
 import { authApi } from '../../lib/api/auth';
 
@@ -24,7 +24,6 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   const [step, setStep] = useState<Step>('request');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Subtle shake animation for inline error
   const shakeAnim = React.useRef(new Animated.Value(0)).current;
 
   const triggerShake = () => {
@@ -54,24 +53,25 @@ export default function ForgotPasswordScreen({ navigation }: any) {
     setErrorMsg(null);
 
     try {
-      await authApi.forgotPassword({ email: trimmed });
-      setStep('sent');
+      const result = await authApi.forgotPassword({ email: trimmed });
+      if (result.sent) {
+        setStep('sent');
+      } else {
+        setErrorMsg('We could not send the reset email right now. Please try again later.');
+        triggerShake();
+      }
     } catch (err: any) {
-      // For security, we always show the success state even if the email
-      // doesn't exist — this prevents user enumeration attacks.
-      // Only surface genuine network / server errors.
       if (err?.code === 'BACKEND_UNREACHABLE' || err?.status === 0) {
         setErrorMsg('Cannot connect to server. Please check your connection and try again.');
         triggerShake();
       } else {
-        // Surface Supabase-level errors like rate limiting, otherwise swallow
         const msg = err?.message ?? '';
         if (msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('limit')) {
           setErrorMsg('Too many requests. Please wait a moment and try again.');
           triggerShake();
         } else {
-          // Treat all other errors as success to avoid enumeration
-          setStep('sent');
+          setErrorMsg('We could not send the reset email right now. Please try again later.');
+          triggerShake();
         }
       }
     } finally {
@@ -96,7 +96,6 @@ export default function ForgotPasswordScreen({ navigation }: any) {
           : `We've sent a password reset link to\n${email.trim().toLowerCase()}`
       }
     >
-      {/* Back button */}
       <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
         <Feather name="arrow-left" size={20} color={palette.textPrimary} />
       </TouchableOpacity>
@@ -104,14 +103,16 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       <NLBBCard>
         {step === 'request' ? (
           <>
-            {/* Email input */}
             <View style={styles.form}>
               <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
                 <NLBBInput
                   label="Email"
                   icon="mail"
                   value={email}
-                  onChangeText={(v) => { setEmail(v); if (errorMsg) setErrorMsg(null); }}
+                  onChangeText={(v) => {
+                    setEmail(v);
+                    if (errorMsg) setErrorMsg(null);
+                  }}
                   placeholder="your@email.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -135,17 +136,12 @@ export default function ForgotPasswordScreen({ navigation }: any) {
               style={styles.submitBtn}
             />
 
-            {/* Return to login */}
-            <TouchableOpacity
-              onPress={handleBack}
-              style={styles.returnRow}
-            >
+            <TouchableOpacity onPress={handleBack} style={styles.returnRow}>
               <Feather name="chevron-left" size={14} color={palette.gold} />
               <Text style={styles.returnText}>Back to Sign In</Text>
             </TouchableOpacity>
           </>
         ) : (
-          /* ── Success state ── */
           <>
             <View style={styles.successIconWrap}>
               <View style={styles.successIconOuter}>
@@ -164,7 +160,10 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 
             <NLBBButton
               label="Resend Link"
-              onPress={() => { setStep('request'); setErrorMsg(null); }}
+              onPress={() => {
+                setStep('request');
+                setErrorMsg(null);
+              }}
               size="lg"
               variant="secondary"
               style={styles.submitBtn}
@@ -225,7 +224,6 @@ function createStyles(p: ColorPalette) {
       fontFamily: Fonts.sansMedium,
       fontSize: 13,
     },
-    // ── Success state ──────────────────────────────────
     successIconWrap: {
       alignItems: 'center',
       marginBottom: 20,
