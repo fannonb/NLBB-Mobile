@@ -17,6 +17,7 @@ Workflows:
 Required GitHub secret:
 
 - `EXPO_TOKEN`
+- `GOOGLE_SERVICES_JSON`
 
 Recommended behavior:
 
@@ -61,6 +62,7 @@ Deployment:
 Mobile repo:
 
 - `EXPO_TOKEN`
+- `GOOGLE_SERVICES_JSON`
 
 Admin web repo:
 
@@ -83,5 +85,6 @@ Backend repo:
 ## Remaining setup you still need in GitHub
 
 1. Add `EXPO_TOKEN` to the mobile repository Actions secrets
-2. Optionally add `VERCEL_DEPLOY_HOOK_URL` to `NLBB_Admin`
-3. Make sure the mobile code is pushed to its own GitHub repo so the workflows can actually run
+2. Add `GOOGLE_SERVICES_JSON` to the mobile repository Actions secrets using the full contents of `google-services.json`
+3. Optionally add `VERCEL_DEPLOY_HOOK_URL` to `NLBB_Admin`
+4. Make sure the mobile code is pushed to its own GitHub repo so the workflows can actually run
