@@ -5,12 +5,15 @@ node_modules/
 
 # Expo
 .expo/
+.expo-export-temp/
+.expo-export-temp-2/
 dist/
 web-build/
 expo-env.d.ts
 
 # Native
 .kotlin/
+.gradle-home/
 *.orig.*
 *.jks
 *.p8
@@ -20,17 +23,22 @@ expo-env.d.ts
 
 # Metro
 .metro-health-check*
+.tmp/
 
 # debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
+*.out.log
+*.err.log
 
 # macOS
 .DS_Store
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
@@ -39,3 +47,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local tooling
+.npm-cache/
+.yarn-cache/
+.vscode/
+
+# non-app workspaces
+/backend/
+/web/
