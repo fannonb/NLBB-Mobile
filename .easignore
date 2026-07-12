@@ -11,6 +11,10 @@
 .vscode
 .agents
 .claude
+node_modules
+android
+ios
+.env.local
 
 backend
 web
