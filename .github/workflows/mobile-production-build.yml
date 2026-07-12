@@ -11,6 +11,21 @@ on:
         options:
           - production
           - preview
+  push:
+    branches:
+      - main
+    paths:
+      - App.tsx
+      - app.config.js
+      - babel.config.js
+      - eas.json
+      - index.ts
+      - metro.config.js
+      - package.json
+      - package-lock.json
+      - tsconfig.json
+      - assets/**
+      - src/**
 
 jobs:
   build-production:
@@ -58,4 +73,4 @@ jobs:
         run: npm run typecheck
 
       - name: Queue production mobile build
-        run: eas build --platform android --profile ${{ github.event.inputs.profile }} --non-interactive --no-wait
+        run: eas build --platform android --profile ${{ github.event.inputs.profile || 'production' }} --non-interactive --wait

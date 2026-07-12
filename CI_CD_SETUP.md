@@ -12,7 +12,8 @@ Workflows:
   - on every push to `main`, queues an Expo cloud Android APK build
   - can also be run manually
 - `.github/workflows/mobile-production-build.yml`
-  - manual production Android build trigger
+  - on every push to `main`, queues a production Expo cloud Android build
+  - can also be run manually
 
 Required GitHub secret:
 
@@ -22,7 +23,8 @@ Required GitHub secret:
 Recommended behavior:
 
 - Push to `main` for a fresh preview APK in Expo cloud
-- Use the manual production workflow when you want a release build intentionally
+- Push to `main` for a fresh production build in Expo cloud as well
+- Use the manual production workflow when you want to choose `preview` or `production` explicitly
 
 ## 2. Admin web app
 
