@@ -40,6 +40,7 @@ import { providerManagementApi, ProviderProfilePayload } from '../../lib/api/pro
 import { authApi } from '../../lib/api/auth';
 import { providerApi } from '../../lib/api/providers';
 import { openExternalUrl } from '../../lib/contactActions';
+import { notificationsApi } from '../../lib/api/notifications';
 
 const DEFAULT_COVER =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
@@ -264,6 +265,7 @@ export default function ProviderProfileScreen({ navigation }: any) {
     type: 'success',
   });
   const { modal, showSuccess, showError, showInfo, showActionSheet, hideModal } = useModalManager();
+  const [sendingTestPush, setSendingTestPush] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -365,6 +367,22 @@ export default function ProviderProfileScreen({ navigation }: any) {
     const opened = await openExternalUrl(url);
     if (!opened) {
       showError('Unable to Open', `This ${platform} link is not supported on your device.`);
+    }
+  };
+
+  const sendTestPush = async () => {
+    setSendingTestPush(true);
+    try {
+      await notificationsApi.sendTestPush({
+        title: 'NLBB push test',
+        body: 'If this appears, push notifications are working correctly on your device.',
+      });
+      showSuccess('Test Push Sent', 'We sent a test notification to this device. Watch for it now.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to send the test push right now.';
+      showError('Push Test Failed', message);
+    } finally {
+      setSendingTestPush(false);
     }
   };
 
@@ -1005,6 +1023,24 @@ export default function ProviderProfileScreen({ navigation }: any) {
                   <Text style={styles.dayHours}>{form.phone || 'No phone set'}</Text>
                 </FieldRow>
               </View>
+
+              <TouchableOpacity
+                style={styles.settingsBtn}
+                onPress={sendTestPush}
+                disabled={sendingTestPush}
+                activeOpacity={0.85}
+              >
+                <Feather name="bell" size={18} color={palette.gold} />
+                <View style={styles.settingsBtnContent}>
+                  <Text style={styles.settingsBtnLabel}>
+                    {sendingTestPush ? 'Sending Test Push...' : 'Send Test Push'}
+                  </Text>
+                  <Text style={styles.settingsBtnSub}>
+                    Quickly verify push notifications on this device
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={palette.textMuted} />
+              </TouchableOpacity>
 
               {!isEditing ? (
                 <TouchableOpacity
