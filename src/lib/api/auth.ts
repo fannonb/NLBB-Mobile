@@ -33,7 +33,7 @@ export interface UpsertProfileInput {
   avatar?: string;
 }
 
-const requestAuth = async <T>(path: string, body?: unknown) => {
+const requestAuth = async <T>(path: string, body?: unknown, timeoutMs = 12000) => {
   const { response, resolvedBaseUrl, attemptedBaseUrls, errors: networkErrors } =
     await fetchWithApiBaseUrlFallback(path, {
       method: 'POST',
@@ -42,7 +42,7 @@ const requestAuth = async <T>(path: string, body?: unknown) => {
         'Content-Type': 'application/json',
       },
       body: body === undefined ? undefined : JSON.stringify(body),
-    }, 12000);
+    }, timeoutMs);
 
   if (!response) {
     console.warn('[authApi] backend unreachable', {
@@ -161,7 +161,7 @@ export const authApi = {
     apiClient.post<{ registered: boolean }>('auth/push-token', payload),
   /** Request a password-reset email. Safe to call even if email is not registered. */
   forgotPassword: (payload: { email: string }) =>
-    requestAuth<{ sent: boolean }>('auth/forgot-password', payload),
+    requestAuth<{ sent: boolean }>('auth/forgot-password', payload, 30000),
   /** Complete the reset: exchange OTP token + new password (used from deep link flow). */
   resetPassword: (payload: { token: string; newPassword: string }) =>
     requestAuth<{ reset: boolean }>('auth/reset-password', payload),
