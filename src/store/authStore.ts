@@ -110,10 +110,8 @@ const syncSignedInAppState = async (user: User) => {
   appState.resetSessionState();
   bookingState.resetBookings();
   await hydrateUserPreferences();
-  await Promise.allSettled([
-    appState.hydrateSessionState(user.role),
-    bookingState.loadMyBookings({ force: true }),
-  ]);
+  await appState.hydrateSessionState(user.role);
+  void bookingState.loadMyBookings({ force: true });
 };
 
 const resetSignedOutState = () => {
