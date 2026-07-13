@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
@@ -93,9 +94,11 @@ export default function ProviderNotificationsScreen({ navigation }: any) {
 
   const unreadCount = providerNotifications.filter((n) => !n.isRead).length;
 
-  useEffect(() => {
-    hydrateProviderNotifications();
-  }, [hydrateProviderNotifications]);
+  useFocusEffect(
+    useCallback(() => {
+      void hydrateProviderNotifications({ force: true });
+    }, [hydrateProviderNotifications])
+  );
 
   const handleNotificationPress = async (notification: ProviderNotification) => {
     await markProviderNotificationRead(notification.id);

@@ -17,6 +17,7 @@ import { ALLOW_SEEDED_IDENTITIES, ENABLE_DEMO_MODE } from '../lib/demo/config';
 import { resetDemoState } from '../lib/demo/demoState';
 import { registerForPushNotificationsAsync } from '../lib/push';
 import { useAppStore } from './appStore';
+import { useBookingDataStore } from './bookingDataStore';
 
 interface AuthState {
   user: User | null;
@@ -105,9 +106,19 @@ const hydrateUserPreferences = async () => {
 
 const syncSignedInAppState = async (user: User) => {
   const appState = useAppStore.getState();
+  const bookingState = useBookingDataStore.getState();
   appState.resetSessionState();
+  bookingState.resetBookings();
   await hydrateUserPreferences();
-  await appState.hydrateSessionState(user.role);
+  await Promise.allSettled([
+    appState.hydrateSessionState(user.role),
+    bookingState.loadMyBookings({ force: true }),
+  ]);
+};
+
+const resetSignedOutState = () => {
+  useAppStore.getState().resetSessionState();
+  useBookingDataStore.getState().resetBookings();
 };
 
 const applySession = async (set: (state: Partial<AuthState>) => void, session: AuthSessionResponse) => {
@@ -184,7 +195,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } catch {
         await clearStoredSession();
         set({ user: null, isLoggedIn: false });
-        useAppStore.getState().resetSessionState();
+        resetSignedOutState();
       } finally {
         set({ isInitializing: false, isReady: true });
       }
@@ -220,7 +231,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       await clearStoredSession();
       set({ user: null, isLoggedIn: false });
-      useAppStore.getState().resetSessionState();
+      resetSignedOutState();
     }
   },
 
@@ -238,7 +249,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       resetDemoState();
       await setStoredSession({ accessToken: demoTokenFor(normalizedEmail), refreshToken: '', expiresIn: 86400 });
       set({ user: demoUser, isLoggedIn: true });
-      useAppStore.getState().resetSessionState();
+      resetSignedOutState();
       return { success: true, role: demoUser.role };
     }
 
@@ -262,7 +273,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await authApi.logout().catch(() => undefined);
         await clearStoredSession();
         set({ user: null, isLoggedIn: false });
-        useAppStore.getState().resetSessionState();
+        resetSignedOutState();
         return {
           success: false,
           role: null,
@@ -342,7 +353,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     await clearStoredSession();
     set({ user: null, isLoggedIn: false });
-    useAppStore.getState().resetSessionState();
+    resetSignedOutState();
 
     void logoutPromise;
   },

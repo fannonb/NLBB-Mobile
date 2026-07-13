@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { resolveImageUrl } from '../../lib/config';
@@ -17,8 +18,9 @@ import EmptyState from '../../components/EmptyState';
 import ConfirmModal from '../../components/ConfirmModal';
 import InfoModal from '../../components/InfoModal';
 import Toast from '../../components/Toast';
-import { bookingApi, toProviderAppointmentCard, ProviderAppointmentCard, ProviderAppointmentStatus } from '../../lib/api/bookings';
+import { toProviderAppointmentCard, ProviderAppointmentCard, ProviderAppointmentStatus } from '../../lib/api/bookings';
 import { openPhoneNumber, openWhatsAppContact } from '../../lib/contactActions';
+import { useBookingDataStore } from '../../store/bookingDataStore';
 
 type TabType = 'all' | ProviderAppointmentStatus;
 type ManageableAppointmentStatus = Exclude<ProviderAppointmentStatus, 'pending'>;
@@ -141,9 +143,12 @@ export default function AppointmentsScreen({ navigation }: any) {
   const palette = useThemedColors();
   const shadow = useThemedShadows();
   const styles = useMemo(() => createAppointmentsStyles(palette, shadow), [palette, shadow]);
-  const [activeTab, setActiveTab] = useState<TabType>('upcoming');
-  const [appointments, setAppointments] = useState<ProviderAppointmentCard[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('pending');
+  const bookingRecords = useBookingDataStore((state) => state.records);
+  const loading = useBookingDataStore((state) => state.loading);
+  const loadedAt = useBookingDataStore((state) => state.loadedAt);
+  const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
+  const updateBookingStatus = useBookingDataStore((state) => state.updateBookingStatus);
   const [confirm, setConfirm] = useState<{ id: string; action: ManageableAppointmentStatus; title: string; msg: string } | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' }>({
     visible: false, message: '', type: 'success',
@@ -158,37 +163,22 @@ export default function AppointmentsScreen({ navigation }: any) {
     setInfoModal({ visible: true, title, message });
   };
 
-  useEffect(() => {
-    let active = true;
+  useFocusEffect(
+    useCallback(() => {
+      void loadMyBookings({ force: true });
+    }, [loadMyBookings])
+  );
 
-    const loadAppointments = async () => {
-      setLoading(true);
-      try {
-        const response = await bookingApi.listMyBookings();
-        if (!active) return;
-        setAppointments(response.map((booking) => toProviderAppointmentCard(booking)));
-      } catch {
-        if (active) {
-          setAppointments([]);
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadAppointments();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  const appointments = useMemo(
+    () => bookingRecords.map((booking) => toProviderAppointmentCard(booking)),
+    [bookingRecords]
+  );
 
   const filtered = useMemo(
     () => (activeTab === 'all' ? appointments : appointments.filter((a) => a.status === activeTab)),
     [appointments, activeTab]
   );
+  const isLoadingAppointments = loading || (loadedAt === 0 && appointments.length === 0);
 
   const counts = useMemo(() => ({
     all: appointments.length,
@@ -198,6 +188,16 @@ export default function AppointmentsScreen({ navigation }: any) {
     declined: appointments.filter((a) => a.status === 'declined').length,
     cancelled: appointments.filter((a) => a.status === 'cancelled').length,
   }), [appointments]);
+
+  useEffect(() => {
+    if (
+      activeTab === 'upcoming' &&
+      counts.upcoming === 0 &&
+      counts.pending > 0
+    ) {
+      setActiveTab('pending');
+    }
+  }, [activeTab, counts.pending, counts.upcoming]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ visible: true, message, type });
@@ -210,9 +210,7 @@ export default function AppointmentsScreen({ navigation }: any) {
   const executeAction = async () => {
     if (!confirm) return;
     try {
-      const updated = await bookingApi.updateBookingStatus(confirm.id, toBackendAction(confirm.action));
-      const normalized = toProviderAppointmentCard(updated);
-      setAppointments((current) => current.map((apt) => (apt.id === confirm.id ? normalized : apt)));
+      await updateBookingStatus(confirm.id, toBackendAction(confirm.action));
 
       const messages: Record<ProviderAppointmentStatus, string> = {
         upcoming: 'Booking accepted - client notified.',
@@ -230,8 +228,8 @@ export default function AppointmentsScreen({ navigation }: any) {
   };
 
   const TABS: { key: TabType; label: string }[] = [
-    { key: 'upcoming', label: 'Upcoming' },
     { key: 'pending', label: 'Requests' },
+    { key: 'upcoming', label: 'Upcoming' },
     { key: 'declined', label: 'Declined' },
     { key: 'completed', label: 'Completed' },
     { key: 'all', label: 'All' },
@@ -276,8 +274,8 @@ export default function AppointmentsScreen({ navigation }: any) {
         ))}
       </ScrollView>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, filtered.length === 0 && !loading && { flex: 1 }]}>
-        {loading ? (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, filtered.length === 0 && !isLoadingAppointments && { flex: 1 }]}>
+        {isLoadingAppointments ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="small" color={palette.gold} />
             <Text style={styles.loadingText}>Loading appointments...</Text>

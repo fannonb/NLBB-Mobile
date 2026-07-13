@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Fonts, Radius, Shadow } from '../../constants/theme';
 import { BookingStatus } from '../../types';
-import { bookingApi, toCustomerBookingCard, CustomerBookingCard } from '../../lib/api/bookings';
+import { toCustomerBookingCard, CustomerBookingCard } from '../../lib/api/bookings';
 import { providerApi } from '../../lib/api/providers';
 import EmptyState from '../../components/EmptyState';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -23,6 +24,7 @@ import CustomerAppHeader from '../../components/CustomerAppHeader';
 import { useModalManager } from '../../hooks/useModalManager';
 import { useAuthStore } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
+import { useBookingDataStore } from '../../store/bookingDataStore';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { openPhoneNumber, openWhatsAppContact } from '../../lib/contactActions';
 
@@ -68,53 +70,35 @@ export default function MyBookingsScreen({ navigation, route }: any) {
   const { user } = useAuthStore();
   const { isLoggedIn, requireAuth } = useRequireAuth();
   const { customerNotifications, hydrateCustomerNotifications } = useAppStore();
+  const bookingRecords = useBookingDataStore((state) => state.records);
+  const loading = useBookingDataStore((state) => state.loading);
+  const loadedAt = useBookingDataStore((state) => state.loadedAt);
+  const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
+  const updateBookingStatus = useBookingDataStore((state) => state.updateBookingStatus);
   const unreadCount = customerNotifications.filter((n) => !n.isRead).length;
   const [activeTab, setActiveTab] = useState<BookingStatus>('confirmed');
   const [cancelConfirm, setCancelConfirm] = useState<string | null>(null);
-  const [bookings, setBookings] = useState<DisplayBooking[]>([]);
-  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' }>({
     visible: false, message: '', type: 'success',
   });
   const highlightedBookingId = route?.params?.bookingId as string | undefined;
   const { modal, showError, showInfo, hideModal } = useModalManager();
 
-  useEffect(() => {
-    if (!isLoggedIn) {
-      setLoading(false);
-      setBookings([]);
-      return;
-    }
-
-    let active = true;
-
-    const loadBookings = async () => {
-      setLoading(true);
-      try {
-        const response = await bookingApi.listMyBookings();
-        if (!active) return;
-        setBookings(response.map((booking) => normalizeBooking(toCustomerBookingCard(booking))));
-      } catch {
-        if (active) {
-          setBookings([]);
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadBookings();
-
-    return () => {
-      active = false;
-    };
-  }, [isLoggedIn]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoggedIn) return;
+      void loadMyBookings({ force: true });
+    }, [isLoggedIn, loadMyBookings])
+  );
 
   useEffect(() => {
-    hydrateCustomerNotifications();
+    hydrateCustomerNotifications({ force: true });
   }, [hydrateCustomerNotifications]);
+
+  const bookings = useMemo(
+    () => bookingRecords.map((booking) => normalizeBooking(toCustomerBookingCard(booking))),
+    [bookingRecords]
+  );
 
   useEffect(() => {
     if (!highlightedBookingId || bookings.length === 0) {
@@ -131,6 +115,7 @@ export default function MyBookingsScreen({ navigation, route }: any) {
     () => bookings.filter((booking) => booking.status === activeTab),
     [activeTab, bookings]
   );
+  const isLoadingBookings = loading || (isLoggedIn && loadedAt === 0 && bookings.length === 0);
 
   const tabCounts = useMemo(
     () => ({
@@ -145,9 +130,7 @@ export default function MyBookingsScreen({ navigation, route }: any) {
 
   const handleCancel = async (id: string) => {
     try {
-      const updated = await bookingApi.updateBookingStatus(id, 'cancelled');
-      const normalized = normalizeBooking(toCustomerBookingCard(updated));
-      setBookings((current) => current.map((booking) => (booking.id === id ? normalized : booking)));
+      await updateBookingStatus(id, 'cancelled');
       setToast({ visible: true, message: 'Booking cancelled.', type: 'info' });
     } catch (error: any) {
       showError('Could Not Cancel Booking', error?.message ?? 'Please try again.');
@@ -250,9 +233,9 @@ export default function MyBookingsScreen({ navigation, route }: any) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, filtered.length === 0 && !loading && { flex: 1 }]}
+        contentContainerStyle={[styles.scroll, filtered.length === 0 && !isLoadingBookings && { flex: 1 }]}
       >
-        {loading ? (
+        {isLoadingBookings ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="small" color={Colors.gold} />
             <Text style={styles.loadingText}>Loading your bookings...</Text>

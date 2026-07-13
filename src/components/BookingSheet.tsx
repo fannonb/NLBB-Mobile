@@ -18,6 +18,7 @@ import { ColorPalette, Fonts, Radius, ShadowPalette } from '../constants/theme';
 import { useThemedColors, useThemedShadows } from '../hooks/useThemedColors';
 import { NLBBButton } from './ui';
 import { useBookingSheetStore } from '../store/bookingSheetStore';
+import { useBookingDataStore } from '../store/bookingDataStore';
 import { providerApi } from '../lib/api/providers';
 import {
   bookingApi,
@@ -392,6 +393,7 @@ export default function BookingSheet() {
   const styles = useMemo(() => createSheetStyles(palette, shadow), [palette, shadow]);
 
   const { visible, payload, close } = useBookingSheetStore();
+  const addBookingRecord = useBookingDataStore((state) => state.addBookingRecord);
   const [phase, setPhase] = useState<SheetPhase>('service');
   const successScaleAnim = useRef(new Animated.Value(0)).current;
 
@@ -419,6 +421,12 @@ export default function BookingSheet() {
   const dates = useMemo(() => generateBookingDates(), []);
   const selectedDate = dates[selectedDateIdx];
   const selectedService = services.find((s) => s.id === selectedServiceId);
+
+  useEffect(() => {
+    if (selectedTime && isBookingSlotAvailable(selectedDate, selectedTime)) {
+      setSubmitError(null);
+    }
+  }, [selectedDate, selectedTime]);
 
   const activeStep: 'service' | 'schedule' | 'confirm' =
     phase === 'service' ? 'service' : phase === 'schedule' ? 'schedule' : 'confirm';
@@ -526,6 +534,7 @@ export default function BookingSheet() {
         scheduledAt,
         notes: notes.trim() || undefined,
       });
+      addBookingRecord(booking);
       setCreatedBooking(booking);
       setPhase('success');
     } catch (error: any) {

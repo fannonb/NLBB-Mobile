@@ -14,12 +14,13 @@ import FeedbackModalHost from '../../components/FeedbackModalHost';
 import { useModalManager } from '../../hooks/useModalManager';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthGateStore } from '../../store/authGateStore';
-import { bookingApi, CustomerBookingCard, toCustomerBookingCard } from '../../lib/api/bookings';
+import { toCustomerBookingCard } from '../../lib/api/bookings';
 import { providerApi } from '../../lib/api/providers';
 import { Provider } from '../../types';
 import { authApi } from '../../lib/api/auth';
 import { notificationsApi } from '../../lib/api/notifications';
 import { isApiClientError } from '../../lib/api/client';
+import { useBookingDataStore } from '../../store/bookingDataStore';
 
 
 
@@ -247,9 +248,14 @@ export default function ProfileScreen({ navigation }: any) {
   const { modal, showActionSheet, showInfo, showError, showSuccess, hideModal } = useModalManager();
   const [sendingTestPush, setSendingTestPush] = useState(false);
   const unreadCount = isLoggedIn ? customerNotifications.filter((notification) => !notification.isRead).length : 0;
-  const [recentBooking, setRecentBooking] = useState<CustomerBookingCard | null>(null);
+  const bookingRecords = useBookingDataStore((state) => state.records);
+  const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const recentBooking = useMemo(
+    () => (isLoggedIn && bookingRecords[0] ? toCustomerBookingCard(bookingRecords[0]) : null),
+    [bookingRecords, isLoggedIn]
+  );
 
   const favoriteProviders = useMemo(
     () => providers.filter((provider) => favorites.includes(provider.id)).slice(0, 2),
@@ -373,39 +379,10 @@ export default function ProfileScreen({ navigation }: any) {
     React.useCallback(() => {
       if (isLoggedIn) {
         void refreshCurrentUser();
+        void loadMyBookings();
       }
-    }, [refreshCurrentUser, isLoggedIn])
+    }, [refreshCurrentUser, isLoggedIn, loadMyBookings])
   );
-
-  useEffect(() => {
-    if (!isLoggedIn) {
-      setRecentBooking(null);
-      return;
-    }
-
-    let active = true;
-
-    const loadRecentBooking = async () => {
-      try {
-        const bookings = await bookingApi.listMyBookings();
-        if (!active) {
-          return;
-        }
-        const latest = bookings[0] ? toCustomerBookingCard(bookings[0]) : null;
-        setRecentBooking(latest);
-      } catch {
-        if (active) {
-          setRecentBooking(null);
-        }
-      }
-    };
-
-    loadRecentBooking();
-
-    return () => {
-      active = false;
-    };
-  }, [isLoggedIn]);
 
   useEffect(() => {
     let active = true;

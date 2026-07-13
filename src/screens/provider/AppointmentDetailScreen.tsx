@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { resolveImageUrl } from '../../lib/config';
@@ -17,8 +18,9 @@ import ConfirmModal from '../../components/ConfirmModal';
 import InfoModal from '../../components/InfoModal';
 import Toast from '../../components/Toast';
 import { useModalManager } from '../../hooks/useModalManager';
-import { bookingApi, toProviderAppointmentCard, ProviderAppointmentCard, ProviderAppointmentStatus } from '../../lib/api/bookings';
+import { toProviderAppointmentCard, ProviderAppointmentStatus } from '../../lib/api/bookings';
 import { openPhoneNumber, openWhatsAppContact } from '../../lib/contactActions';
+import { useBookingDataStore } from '../../store/bookingDataStore';
 
 async function callPhone(phone: string, showInfo: (title: string, message: string) => void) {
   if (!phone) {
@@ -141,8 +143,11 @@ export default function AppointmentDetailScreen({ navigation, route }: any) {
   const shadow = useThemedShadows();
   const styles = useMemo(() => createDetailStyles(palette, shadow), [palette, shadow]);
   const { appointmentId } = route.params ?? {};
-  const [appointment, setAppointment] = useState<ProviderAppointmentCard | null>(null);
-  const [loading, setLoading] = useState(true);
+  const bookingRecords = useBookingDataStore((state) => state.records);
+  const loading = useBookingDataStore((state) => state.loading);
+  const loadedAt = useBookingDataStore((state) => state.loadedAt);
+  const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
+  const updateBookingStatus = useBookingDataStore((state) => state.updateBookingStatus);
   const [confirm, setConfirm] = useState<{ action: ManageableAppointmentStatus; title: string; msg: string } | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' }>({
     visible: false, message: '', type: 'success',
@@ -158,37 +163,20 @@ export default function AppointmentDetailScreen({ navigation, route }: any) {
     setInfoModal({ visible: true, title, message });
   };
 
-  useEffect(() => {
-    let active = true;
+  useFocusEffect(
+    useCallback(() => {
+      void loadMyBookings({ force: true });
+    }, [loadMyBookings])
+  );
 
-    const loadAppointment = async () => {
-      setLoading(true);
-      try {
-        const response = await bookingApi.listMyBookings();
-        if (!active) return;
-        const found = response.map((booking) => toProviderAppointmentCard(booking)).find((item) => item.id === appointmentId);
-        setAppointment(found ?? null);
-      } catch {
-        if (active) {
-          setAppointment(null);
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadAppointment();
-
-    return () => {
-      active = false;
-    };
-  }, [appointmentId]);
+  const appointment = useMemo(
+    () => bookingRecords.map((booking) => toProviderAppointmentCard(booking)).find((item) => item.id === appointmentId) ?? null,
+    [appointmentId, bookingRecords]
+  );
 
   const statusColors = useMemo(() => getStatusColors(palette), [palette]);
 
-  if (loading) {
+  if (loading || (loadedAt === 0 && !appointment)) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
@@ -228,8 +216,7 @@ export default function AppointmentDetailScreen({ navigation, route }: any) {
   const executeAction = async () => {
     if (!confirm) return;
     try {
-      const updated = await bookingApi.updateBookingStatus(appointment.id, actionToBackend(confirm.action));
-      setAppointment(toProviderAppointmentCard(updated));
+      await updateBookingStatus(appointment.id, actionToBackend(confirm.action));
       const msgs: Record<ProviderAppointmentStatus, string> = {
         upcoming: 'Booking accepted.',
         declined: 'Booking declined.',
@@ -383,4 +370,3 @@ export default function AppointmentDetailScreen({ navigation, route }: any) {
     </View>
   );
 }
-

@@ -8,8 +8,9 @@ import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import SectionHeader from '../../components/SectionHeader';
 import Toast from '../../components/Toast';
 import { useAppStore } from '../../store/appStore';
+import { useBookingDataStore } from '../../store/bookingDataStore';
 import { resolveImageUrl } from '../../lib/config';
-import { bookingApi, toProviderAppointmentCard, ProviderAppointmentCard, BookingRecord } from '../../lib/api/bookings';
+import { toProviderAppointmentCard } from '../../lib/api/bookings';
 import { providerManagementApi } from '../../lib/api/providerManagement';
 import { useAuthStore } from '../../store/authStore';
 import { openPhoneNumber, openWhatsAppContact } from '../../lib/contactActions';
@@ -402,9 +403,12 @@ export default function DashboardScreen({ navigation }: any) {
     hydrateProviderNotifications,
     updateProviderProfile,
   } = useAppStore();
-  const [appointments, setAppointments] = useState<ProviderAppointmentCard[]>([]);
-  const [bookingRecords, setBookingRecords] = useState<BookingRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const bookingRecords = useBookingDataStore((state) => state.records);
+  const bookingsLoading = useBookingDataStore((state) => state.loading);
+  const bookingsLoadedAt = useBookingDataStore((state) => state.loadedAt);
+  const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
+  const updateBookingStatus = useBookingDataStore((state) => state.updateBookingStatus);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [togglingOpen, setTogglingOpen] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
@@ -416,15 +420,13 @@ export default function DashboardScreen({ navigation }: any) {
 
   const loadDashboardData = useCallback(async (active?: { current: boolean }) => {
     const isActive = () => (active ? active.current : true);
-    setLoading(true);
+    setLoadingProfile(true);
     try {
-      const [response, provider] = await Promise.all([
-        bookingApi.listMyBookings(),
+      const [, provider] = await Promise.all([
+        loadMyBookings({ force: true }),
         providerManagementApi.getMyProfile().catch(() => null),
       ]);
       if (!isActive()) return;
-      setBookingRecords(response);
-      setAppointments(response.map((booking) => toProviderAppointmentCard(booking)));
       if (provider) {
         updateProviderProfile({
           businessName: provider.name,
@@ -443,18 +445,15 @@ export default function DashboardScreen({ navigation }: any) {
           isOpen: provider.isOpen ?? true,
         });
       }
-      await hydrateProviderNotifications();
+      await hydrateProviderNotifications({ force: true });
     } catch {
-      if (isActive()) {
-        setBookingRecords([]);
-        setAppointments([]);
-      }
+      // Keep current dashboard data visible when a refresh fails.
     } finally {
       if (isActive()) {
-        setLoading(false);
+        setLoadingProfile(false);
       }
     }
-  }, [hydrateProviderNotifications, updateProviderProfile]);
+  }, [hydrateProviderNotifications, loadMyBookings, updateProviderProfile]);
 
   useFocusEffect(
     useCallback(() => {
@@ -466,6 +465,11 @@ export default function DashboardScreen({ navigation }: any) {
     }, [loadDashboardData])
   );
 
+  const appointments = useMemo(
+    () => bookingRecords.map((booking) => toProviderAppointmentCard(booking)),
+    [bookingRecords]
+  );
+  const loading = loadingProfile || bookingsLoading || bookingsLoadedAt === 0;
   const pending = appointments.filter((a) => a.status === 'pending');
   const upcomingAppointments = [...appointments]
     .filter((a) => a.status === 'upcoming')
@@ -501,10 +505,7 @@ export default function DashboardScreen({ navigation }: any) {
 
   const handleMarkCompleted = async (appointmentId: string) => {
     try {
-      const updated = await bookingApi.updateBookingStatus(appointmentId, 'completed');
-      const normalized = toProviderAppointmentCard(updated);
-      setBookingRecords((current) => current.map((booking) => (booking.id === appointmentId ? updated : booking)));
-      setAppointments((current) => current.map((apt) => (apt.id === appointmentId ? normalized : apt)));
+      await updateBookingStatus(appointmentId, 'completed');
       setToast({
         visible: true,
         message: 'Appointment marked as completed.',

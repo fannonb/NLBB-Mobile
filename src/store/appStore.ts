@@ -148,7 +148,7 @@ interface AppState {
   setBookings: (bookings: Booking[]) => void;
   updateCustomerBookingStatus: (id: string, status: Booking['status']) => void;
 
-  hydrateCustomerNotifications: () => Promise<void>;
+  hydrateCustomerNotifications: (options?: { force?: boolean }) => Promise<void>;
   markCustomerNotificationRead: (id: string) => Promise<void>;
   markAllCustomerNotificationsRead: () => Promise<void>;
 
@@ -164,7 +164,7 @@ interface AppState {
 
   setProviderServices: (services: (Service & { isActive: boolean })[]) => void;
   setProviderReviews: (reviews: Review[]) => void;
-  hydrateProviderNotifications: () => Promise<void>;
+  hydrateProviderNotifications: (options?: { force?: boolean }) => Promise<void>;
 
   addService: (service: Service) => void;
   updateService: (service: Service) => void;
@@ -264,7 +264,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       bookings: state.bookings.map((booking) => (booking.id === id ? { ...booking, status } : booking)),
     })),
 
-  hydrateCustomerNotifications: async () => {
+  hydrateCustomerNotifications: async (options) => {
     if (customerNotificationsHydrationPromise) {
       return customerNotificationsHydrationPromise;
     }
@@ -277,7 +277,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           return;
         }
 
-        if (hasFreshData(lastCustomerNotificationsHydratedAt)) {
+        if (!options?.force && hasFreshData(lastCustomerNotificationsHydratedAt)) {
           return;
         }
 
@@ -346,7 +346,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setProviderReviews: (reviews) => set({ providerReviews: reviews }),
 
-  hydrateProviderNotifications: async () => {
+  hydrateProviderNotifications: async (options) => {
     if (providerNotificationsHydrationPromise) {
       return providerNotificationsHydrationPromise;
     }
@@ -359,7 +359,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           return;
         }
 
-        if (hasFreshData(lastProviderNotificationsHydratedAt)) {
+        if (!options?.force && hasFreshData(lastProviderNotificationsHydratedAt)) {
           return;
         }
 

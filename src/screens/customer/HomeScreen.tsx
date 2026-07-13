@@ -23,10 +23,11 @@ import CustomerAppHeader from '../../components/CustomerAppHeader';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useOpenBooking } from '../../hooks/useOpenBooking';
 import { providerApi } from '../../lib/api/providers';
-import { bookingApi, toCustomerBookingCard } from '../../lib/api/bookings';
+import { toCustomerBookingCard } from '../../lib/api/bookings';
 import { withProviderDistances } from '../../lib/location/providerDistance';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
+import { useBookingDataStore } from '../../store/bookingDataStore';
 import { Category, Provider } from '../../types';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -333,10 +334,11 @@ export default function HomeScreen({ navigation }: any) {
   } = useAppStore();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [bookAgain, setBookAgain] = useState<BookAgainItem[]>([]);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const bookingRecords = useBookingDataStore((state) => state.records);
+  const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
 
   useEffect(() => {
     let active = true;
@@ -365,25 +367,29 @@ export default function HomeScreen({ navigation }: any) {
   }, [hydrateFavorites, hydrateCustomerNotifications]);
 
   useEffect(() => {
-    if (!isLoggedIn) { setBookAgain([]); return; }
-    let active = true;
-    bookingApi.listMyBookings()
-      .then((bookings) => {
-        if (!active) return;
-        const seen = new Set<string>();
-        const recent: BookAgainItem[] = [];
-        for (const raw of bookings) {
-          const b = toCustomerBookingCard(raw);
-          if (seen.has(b.providerId)) continue;
-          seen.add(b.providerId);
-          recent.push({ providerId: b.providerId, providerName: b.providerName, providerImage: b.providerImage, serviceName: b.serviceName });
-          if (recent.length >= 6) break;
-        }
-        setBookAgain(recent);
-      })
-      .catch(() => { if (active) setBookAgain([]); });
-    return () => { active = false; };
-  }, [isLoggedIn]);
+    if (isLoggedIn) {
+      void loadMyBookings();
+    }
+  }, [isLoggedIn, loadMyBookings]);
+
+  const bookAgain = useMemo(() => {
+    if (!isLoggedIn) return [];
+    const seen = new Set<string>();
+    const recent: BookAgainItem[] = [];
+    for (const raw of bookingRecords) {
+      const b = toCustomerBookingCard(raw);
+      if (seen.has(b.providerId)) continue;
+      seen.add(b.providerId);
+      recent.push({
+        providerId: b.providerId,
+        providerName: b.providerName,
+        providerImage: b.providerImage,
+        serviceName: b.serviceName,
+      });
+      if (recent.length >= 6) break;
+    }
+    return recent;
+  }, [bookingRecords, isLoggedIn]);
 
   const rankedProviders = useMemo(
     () => withProviderDistances(providers, currentLocation),

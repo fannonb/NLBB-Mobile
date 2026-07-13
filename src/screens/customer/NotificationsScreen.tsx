@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
@@ -82,9 +83,11 @@ export default function NotificationsScreen({ navigation }: any) {
   } = useAppStore();
   const unreadCount = customerNotifications.filter((n) => !n.isRead).length;
 
-  useEffect(() => {
-    hydrateCustomerNotifications();
-  }, [hydrateCustomerNotifications]);
+  useFocusEffect(
+    useCallback(() => {
+      void hydrateCustomerNotifications({ force: true });
+    }, [hydrateCustomerNotifications])
+  );
 
   const handleNotificationPress = async (notification: Notification) => {
     await markCustomerNotificationRead(notification.id);
