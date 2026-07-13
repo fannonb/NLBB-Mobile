@@ -12,6 +12,8 @@ export const notificationsApi = {
     const notifications = await apiClient.get<Notification[]>('notifications/me');
     return notifications.map(normalizeNotification);
   },
+  sendTestPush: (payload?: { title?: string; body?: string }) =>
+    apiClient.post<Notification>('notifications/test-push', payload ?? {}),
   markNotificationRead: (notificationId: string) =>
     apiClient.patch<Notification>(`notifications/${notificationId}/read`, {}).then(normalizeNotification),
   markAllNotificationsRead: () =>

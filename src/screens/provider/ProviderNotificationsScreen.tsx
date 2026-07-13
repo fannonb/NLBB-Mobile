@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,11 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FeedbackModalHost from '../../components/FeedbackModalHost';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
+import { notificationsApi } from '../../lib/api/notifications';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
+import { useModalManager } from '../../hooks/useModalManager';
 import { useAppStore, ProviderNotification } from '../../store/appStore';
 import EmptyState from '../../components/EmptyState';
 
@@ -43,6 +46,15 @@ function createNotificationsStyles(p: ColorPalette, s: ShadowPalette) {
     },
     markAllBtn: { paddingHorizontal: 4 },
     markAllText: { color: p.gold, fontFamily: Fonts.sansMedium, fontSize: 12 },
+    actionsRow: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 4 },
+    testPushBtn: {
+      alignSelf: 'flex-start',
+      backgroundColor: p.textPrimary,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: Radius.md,
+    },
+    testPushText: { color: p.bg, fontFamily: Fonts.sansMedium, fontSize: 12 },
     list: { padding: 16 },
     item: {
       flexDirection: 'row', gap: 14, alignItems: 'flex-start',
@@ -70,6 +82,8 @@ export default function ProviderNotificationsScreen({ navigation }: any) {
   const shadow = useThemedShadows();
   const styles = useMemo(() => createNotificationsStyles(palette, shadow), [palette, shadow]);
   const typeConfig = useMemo(() => getTypeConfig(palette), [palette]);
+  const { modal, showSuccess, showError, hideModal } = useModalManager();
+  const [sendingTestPush, setSendingTestPush] = useState(false);
   const {
     providerNotifications,
     markProviderNotificationRead,
@@ -108,6 +122,22 @@ export default function ProviderNotificationsScreen({ navigation }: any) {
     }
   };
 
+  const sendTestPush = async () => {
+    setSendingTestPush(true);
+    try {
+      await notificationsApi.sendTestPush({
+        title: 'NLBB push test',
+        body: 'If this appears, push notifications are working correctly on your device.',
+      });
+      showSuccess('Test Push Sent', 'We sent a test notification to this device. Watch for it now.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to send the test push right now.';
+      showError('Push Test Failed', message);
+    } finally {
+      setSendingTestPush(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
@@ -123,6 +153,12 @@ export default function ProviderNotificationsScreen({ navigation }: any) {
         ) : (
           <View style={{ width: 80 }} />
         )}
+      </View>
+
+      <View style={styles.actionsRow}>
+        <TouchableOpacity style={styles.testPushBtn} onPress={sendTestPush} disabled={sendingTestPush}>
+          <Text style={styles.testPushText}>{sendingTestPush ? 'Sending...' : 'Send Test Push'}</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -148,6 +184,7 @@ export default function ProviderNotificationsScreen({ navigation }: any) {
           />
         }
       />
+      <FeedbackModalHost modal={modal} onDismiss={hideModal} />
     </View>
   );
 }
@@ -176,4 +213,3 @@ function NotificationItem({ notif, onPress, typeConfig, styles }: { notif: Provi
     </TouchableOpacity>
   );
 }
-

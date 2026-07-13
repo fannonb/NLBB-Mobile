@@ -15,6 +15,7 @@ import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/them
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { useModalManager } from '../../hooks/useModalManager';
 import { DEFAULT_NOTIFICATION_SETTINGS, NotificationSettings, preferencesApi } from '../../lib/api/preferences';
+import { notificationsApi } from '../../lib/api/notifications';
 import { useAppStore } from '../../store/appStore';
 
 type NotificationSettingId = keyof NotificationSettings;
@@ -130,6 +131,11 @@ function createNotificationSettingsStyles(p: ColorPalette, s: ShadowPalette) {
     },
     quickBtnText: { color: p.bg, fontFamily: Fonts.sansMedium, fontSize: 13 },
     quickBtnTextSecondary: { color: p.textPrimary },
+    testPushBtn: {
+      marginTop: 10,
+      backgroundColor: p.textPrimary,
+      ...s.soft,
+    },
     sectionTitle: {
       fontFamily: Fonts.serifMedium,
       fontSize: 15,
@@ -200,7 +206,8 @@ export default function NotificationSettingsScreen({ navigation }: any) {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { modal, showError, hideModal } = useModalManager();
+  const [sendingTestPush, setSendingTestPush] = useState(false);
+  const { modal, showSuccess, showError, hideModal } = useModalManager();
 
   useEffect(() => {
     let active = true;
@@ -282,6 +289,22 @@ export default function NotificationSettingsScreen({ navigation }: any) {
     void saveNotificationSettings(nextSettings);
   };
 
+  const sendTestPush = async () => {
+    setSendingTestPush(true);
+    try {
+      await notificationsApi.sendTestPush({
+        title: 'NLBB push test',
+        body: 'If this appears, push notifications are working correctly on your device.',
+      });
+      showSuccess('Test Push Sent', 'We sent a test notification to this device. Watch for it now.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to send the test push right now.';
+      showError('Push Test Failed', message);
+    } finally {
+      setSendingTestPush(false);
+    }
+  };
+
   const renderItem = ({
     item: setting,
     index,
@@ -350,10 +373,19 @@ export default function NotificationSettingsScreen({ navigation }: any) {
                 <Text style={[styles.quickBtnText, styles.quickBtnTextSecondary]}>Disable All</Text>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity
+              style={[styles.quickBtn, styles.testPushBtn]}
+              onPress={sendTestPush}
+              disabled={saving || loading || sendingTestPush}
+            >
+              <Text style={styles.quickBtnText}>{sendingTestPush ? 'Sending...' : 'Send Test Push'}</Text>
+            </TouchableOpacity>
             {(loading || saving) && (
               <View style={styles.loadingState}>
                 <ActivityIndicator size="small" color={palette.gold} />
-                <Text style={styles.loadingText}>{loading ? 'Loading preferences...' : 'Saving changes...'}</Text>
+                <Text style={styles.loadingText}>
+                  {loading ? 'Loading preferences...' : 'Saving changes...'}
+                </Text>
               </View>
             )}
           </View>
