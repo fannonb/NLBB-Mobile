@@ -81,6 +81,59 @@ const requestAuth = async <T>(path: string, body?: unknown) => {
   return payload.data;
 };
 
+const requestAuthWithBearer = async <T>(path: string, accessToken: string, body?: unknown) => {
+  const { response, resolvedBaseUrl, attemptedBaseUrls, errors: networkErrors } =
+    await fetchWithApiBaseUrlFallback(
+      path,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      },
+      4000
+    );
+
+  if (!response) {
+    console.warn('[authApi] backend unreachable', {
+      path,
+      attemptedBaseUrls,
+      networkErrors,
+    });
+    throw createApiClientError(
+      `Cannot reach backend. Tried: ${API_BASE_URLS.join(', ')}`,
+      0,
+      'BACKEND_UNREACHABLE',
+      {
+        attemptedBaseUrls,
+        errors: networkErrors,
+      }
+    );
+  }
+
+  type Envelope = { success: boolean; data: T; error?: { code?: string; message?: string } };
+  let payload: Envelope | null = null;
+  try {
+    payload = (await response.json()) as Envelope;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || !payload?.success) {
+    throw createApiClientError(
+      payload?.error?.message ?? `Request failed (${response.status}) via ${resolvedBaseUrl ?? 'unknown-base-url'}`,
+      response.status,
+      payload?.error?.code,
+      undefined
+    );
+  }
+
+  return payload.data;
+};
+
 export const authApi = {
   register: (payload: {
     email: string;
@@ -95,6 +148,8 @@ export const authApi = {
   refresh: (payload: { refreshToken: string }) =>
     requestAuth<Omit<AuthSessionResponse, 'user'>>('auth/refresh', payload),
   logout: () => apiClient.post<{ revoked: boolean }>('auth/logout'),
+  logoutWithAccessToken: (accessToken: string) =>
+    requestAuthWithBearer<{ revoked: boolean }>('auth/logout', accessToken),
   changePassword: (payload: { currentPassword: string; newPassword: string }) =>
     apiClient.post<{ updated: boolean }>('auth/change-password', payload),
   uploadAvatar: (payload: { dataUri: string }) =>
@@ -111,4 +166,3 @@ export const authApi = {
   resetPassword: (payload: { token: string; newPassword: string }) =>
     requestAuth<{ reset: boolean }>('auth/reset-password', payload),
 };
-

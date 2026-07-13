@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ThemeMode } from '../constants/theme';
 import { Service, Booking, Review, Notification, UserRole } from '../types';
+import { getStoredSession } from '../lib/authSession';
 import { favoritesApi } from '../lib/api/favorites';
 import { notificationsApi } from '../lib/api/notifications';
 import { DEFAULT_NOTIFICATION_SETTINGS, NotificationSettings } from '../lib/api/preferences';
@@ -52,6 +53,27 @@ const DEFAULT_WORKING_HOURS: WorkingHours[] = [
 
 const DEFAULT_PROVIDER_COVER =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
+const HYDRATION_COOLDOWN_MS = 10_000;
+
+let favoritesHydrationPromise: Promise<void> | null = null;
+let customerNotificationsHydrationPromise: Promise<void> | null = null;
+let providerNotificationsHydrationPromise: Promise<void> | null = null;
+let lastFavoritesHydratedAt = 0;
+let lastCustomerNotificationsHydratedAt = 0;
+let lastProviderNotificationsHydratedAt = 0;
+
+const hasFreshData = (lastHydratedAt: number) =>
+  lastHydratedAt > 0 && Date.now() - lastHydratedAt < HYDRATION_COOLDOWN_MS;
+
+const resetHydrationState = () => {
+  favoritesHydrationPromise = null;
+  customerNotificationsHydrationPromise = null;
+  providerNotificationsHydrationPromise = null;
+  lastFavoritesHydratedAt = 0;
+  lastCustomerNotificationsHydratedAt = 0;
+  lastProviderNotificationsHydratedAt = 0;
+};
+
 const EMPTY_PROVIDER_PROFILE: ProviderProfile = {
   businessName: '',
   description: '',
@@ -176,12 +198,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   hydrateFavorites: async () => {
-    try {
-      const backendFavorites = await favoritesApi.listFavorites();
-      set({ favorites: backendFavorites.map((provider) => provider.id) });
-    } catch {
-      // Ignore load failures and keep current state.
+    if (favoritesHydrationPromise) {
+      return favoritesHydrationPromise;
     }
+
+    favoritesHydrationPromise = (async () => {
+      try {
+        const session = await getStoredSession();
+        if (!session?.accessToken) {
+          return;
+        }
+
+        if (hasFreshData(lastFavoritesHydratedAt)) {
+          return;
+        }
+
+        const backendFavorites = await favoritesApi.listFavorites();
+        set({ favorites: backendFavorites.map((provider) => provider.id) });
+        lastFavoritesHydratedAt = Date.now();
+      } catch {
+        // Ignore load failures and keep current state.
+      } finally {
+        favoritesHydrationPromise = null;
+      }
+    })();
+
+    return favoritesHydrationPromise;
   },
 
   addBooking: (booking) =>
@@ -195,12 +237,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   hydrateCustomerNotifications: async () => {
-    try {
-      const notifications = await notificationsApi.listMyNotifications();
-      set({ customerNotifications: notifications });
-    } catch {
-      // Ignore load failures and keep current state.
+    if (customerNotificationsHydrationPromise) {
+      return customerNotificationsHydrationPromise;
     }
+
+    customerNotificationsHydrationPromise = (async () => {
+      try {
+        const session = await getStoredSession();
+        if (!session?.accessToken) {
+          return;
+        }
+
+        if (hasFreshData(lastCustomerNotificationsHydratedAt)) {
+          return;
+        }
+
+        const notifications = await notificationsApi.listMyNotifications();
+        set({ customerNotifications: notifications });
+        lastCustomerNotificationsHydratedAt = Date.now();
+      } catch {
+        // Ignore load failures and keep current state.
+      } finally {
+        customerNotificationsHydrationPromise = null;
+      }
+    })();
+
+    return customerNotificationsHydrationPromise;
   },
 
   markCustomerNotificationRead: async (id) => {
@@ -249,12 +311,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   setProviderReviews: (reviews) => set({ providerReviews: reviews }),
 
   hydrateProviderNotifications: async () => {
-    try {
-      const notifications = await notificationsApi.listMyNotifications();
-      set({ providerNotifications: notifications.map(toProviderNotification) });
-    } catch {
-      // Ignore load failures and keep current state.
+    if (providerNotificationsHydrationPromise) {
+      return providerNotificationsHydrationPromise;
     }
+
+    providerNotificationsHydrationPromise = (async () => {
+      try {
+        const session = await getStoredSession();
+        if (!session?.accessToken) {
+          return;
+        }
+
+        if (hasFreshData(lastProviderNotificationsHydratedAt)) {
+          return;
+        }
+
+        const notifications = await notificationsApi.listMyNotifications();
+        set({ providerNotifications: notifications.map(toProviderNotification) });
+        lastProviderNotificationsHydratedAt = Date.now();
+      } catch {
+        // Ignore load failures and keep current state.
+      } finally {
+        providerNotificationsHydrationPromise = null;
+      }
+    })();
+
+    return providerNotificationsHydrationPromise;
   },
 
   addService: (service) =>
@@ -331,11 +413,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   resetSessionState: () =>
-    set({
-      favorites: [],
-      bookings: [],
-      customerNotifications: [],
-      providerNotifications: [],
+    set(() => {
+      resetHydrationState();
+      return {
+        favorites: [],
+        bookings: [],
+        customerNotifications: [],
+        providerNotifications: [],
+      };
     }),
 
   hydrateSessionState: async (role) => {

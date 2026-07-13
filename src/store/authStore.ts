@@ -71,6 +71,8 @@ const mapBackendUserToAppUser = (profile: BackendUserProfile): User => ({
   location: profile.location ?? undefined,
 });
 
+const LOGOUT_NETWORK_TIMEOUT_MS = 1500;
+
 let initialized = false;
 let initializePromise: Promise<void> | null = null;
 
@@ -329,15 +331,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     const session = await getStoredSession();
     const isDemo = ENABLE_DEMO_MODE && session ? getDemoUserFromToken(session.accessToken) !== null : false;
-    if (!isDemo) {
-      try {
-        await authApi.logout();
-      } catch {
-        // Ignore backend logout failures and clear local state below.
-      }
-    }
+
+    const logoutPromise =
+      !isDemo && session?.accessToken
+        ? Promise.race([
+            authApi.logoutWithAccessToken(session.accessToken),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), LOGOUT_NETWORK_TIMEOUT_MS)),
+          ]).catch(() => undefined)
+        : Promise.resolve();
+
     await clearStoredSession();
     set({ user: null, isLoggedIn: false });
     useAppStore.getState().resetSessionState();
+
+    void logoutPromise;
   },
 }));
