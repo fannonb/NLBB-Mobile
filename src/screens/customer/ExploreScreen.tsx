@@ -225,9 +225,10 @@ export default function ExploreScreen({ navigation, route }: any) {
         !activeCategory || provider.category.toLowerCase().includes(activeCategory.toLowerCase());
       const matchesRating = filters.minRating === null || provider.rating >= filters.minRating;
       const matchesPrice = filters.maxPrice === null || provider.priceFrom <= filters.maxPrice;
-      const distanceKm = provider.distanceKm ?? NaN;
+      const distanceKm = provider.distanceKm;
+      const hasKnownDistance = typeof distanceKm === 'number' && Number.isFinite(distanceKm);
       const matchesDistance =
-        filters.maxDistanceKm === null || (!Number.isNaN(distanceKm) && distanceKm <= filters.maxDistanceKm);
+        filters.maxDistanceKm === null || !hasKnownDistance || distanceKm <= filters.maxDistanceKm;
       const matchesOpenNow = !filters.openNowOnly || provider.isOpen;
       return (
         matchesSearch &&

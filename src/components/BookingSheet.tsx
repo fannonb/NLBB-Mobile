@@ -486,16 +486,31 @@ export default function BookingSheet() {
 
   const goToSchedule = () => {
     if (!selectedServiceId) return;
+    setSubmitError(null);
     setPhase('schedule');
   };
 
   const goToConfirm = () => {
     if (!selectedTime) return;
+    if (!isBookingSlotAvailable(selectedDate, selectedTime)) {
+      setSubmitError('That time slot is no longer available. Please pick another available time.');
+      setSelectedTime(null);
+      setPhase('schedule');
+      return;
+    }
+    setSubmitError(null);
     setPhase('confirm');
   };
 
   const handleSubmit = async () => {
     if (!payload || !selectedService || !selectedTime) return;
+
+    if (!isBookingSlotAvailable(selectedDate, selectedTime)) {
+      setSubmitError('That time slot is no longer available. Please pick another available time.');
+      setSelectedTime(null);
+      setPhase('schedule');
+      return;
+    }
 
     setPhase('loading');
     setSubmitError(null);
@@ -540,7 +555,10 @@ export default function BookingSheet() {
               <TouchableOpacity
                 key={service.id}
                 style={[styles.serviceItem, isActive && styles.serviceItemActive]}
-                onPress={() => setSelectedServiceId(service.id)}
+                onPress={() => {
+                  setSubmitError(null);
+                  setSelectedServiceId(service.id);
+                }}
                 activeOpacity={0.85}
               >
                 <View style={styles.serviceInfo}>
@@ -571,6 +589,7 @@ export default function BookingSheet() {
               <TouchableOpacity
                 key={idx}
                 onPress={() => {
+                  setSubmitError(null);
                   setSelectedDateIdx(idx);
                   setSelectedTime(null);
                 }}
@@ -596,7 +615,11 @@ export default function BookingSheet() {
             return (
               <TouchableOpacity
                 key={slot}
-                onPress={() => available && setSelectedTime(slot)}
+                onPress={() => {
+                  if (!available) return;
+                  setSubmitError(null);
+                  setSelectedTime(slot);
+                }}
                 style={[
                   styles.timeSlot,
                   active && styles.timeSlotActive,
@@ -614,7 +637,10 @@ export default function BookingSheet() {
         <View style={styles.notesInput}>
           <TextInput
             value={notes}
-            onChangeText={setNotes}
+            onChangeText={(value) => {
+              setSubmitError(null);
+              setNotes(value);
+            }}
             placeholder="Any special requests..."
             placeholderTextColor={palette.textMuted}
             style={styles.notesText}
@@ -719,7 +745,15 @@ export default function BookingSheet() {
       return (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.footerRow}>
-            <NLBBButton label="Back" onPress={() => setPhase('service')} variant="secondary" style={{ flex: 1 }} />
+            <NLBBButton
+              label="Back"
+              onPress={() => {
+                setSubmitError(null);
+                setPhase('service');
+              }}
+              variant="secondary"
+              style={{ flex: 1 }}
+            />
             <NLBBButton
               label="Review"
               onPress={goToConfirm}
@@ -734,7 +768,15 @@ export default function BookingSheet() {
     return (
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.footerRow}>
-          <NLBBButton label="Back" onPress={() => setPhase('schedule')} variant="secondary" style={{ flex: 1 }} />
+          <NLBBButton
+            label="Back"
+            onPress={() => {
+              setSubmitError(null);
+              setPhase('schedule');
+            }}
+            variant="secondary"
+            style={{ flex: 1 }}
+          />
           <NLBBButton label="Confirm booking" onPress={handleSubmit} style={{ flex: 1 }} />
         </View>
       </View>
