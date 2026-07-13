@@ -8,11 +8,14 @@ Workflows:
 
 - `.github/workflows/ci.yml`
   - validates mobile, web, and backend code in the workspace
+- `.github/workflows/mobile-updates.yml`
+  - on every push to `main`, publishes an Expo OTA update to the `preview` and `production` channels
+  - also available manually if you want to target one channel at a time
 - `.github/workflows/mobile-preview-build.yml`
-  - on every push to `main`, queues an Expo cloud Android APK build
+  - queues an Expo cloud Android APK build only for native-impacting changes
   - can also be run manually
 - `.github/workflows/mobile-production-build.yml`
-  - on every push to `main`, queues a production Expo cloud Android build
+  - queues a production Expo cloud Android build only for native-impacting changes
   - can also be run manually
 
 Required GitHub secret:
@@ -22,9 +25,9 @@ Required GitHub secret:
 
 Recommended behavior:
 
-- Push to `main` for a fresh preview APK in Expo cloud
-- Push to `main` for a fresh production build in Expo cloud as well
-- Use the manual production workflow when you want to choose `preview` or `production` explicitly
+- Push to `main` for an instant OTA update to the installed preview and production builds
+- Use APK builds only when a native dependency, permissions, Firebase config, or app config changes
+- Use the manual build workflows when you specifically want a fresh APK or AAB artifact
 
 ## 2. Admin web app
 

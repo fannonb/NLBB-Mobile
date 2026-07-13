@@ -18,6 +18,12 @@ module.exports = {
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     newArchEnabled: false,
+    runtimeVersion: {
+      policy: 'fingerprint',
+    },
+    updates: {
+      url: 'https://u.expo.dev/1dba9518-f620-4809-9c25-6d7538549de2',
+    },
     splash: {
       image: './assets/transparent_logo.png',
       resizeMode: 'contain',

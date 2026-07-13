@@ -6,17 +6,16 @@ on:
     branches:
       - main
     paths:
-      - App.tsx
       - app.config.js
       - babel.config.js
       - eas.json
+      - google-services.json
       - index.ts
       - metro.config.js
       - package.json
       - package-lock.json
       - tsconfig.json
       - assets/**
-      - src/**
 
 concurrency:
   group: mobile-preview-${{ github.ref }}
