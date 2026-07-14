@@ -12,6 +12,7 @@ import { applyThemeMode, getThemeColors, ThemeMode } from './src/constants/theme
 import { loadThemePreference } from './src/lib/themePreference';
 import { useAppStore } from './src/store/appStore';
 import { useAuthStore } from './src/store/authStore';
+import { useBookingDataStore } from './src/store/bookingDataStore';
 import RootNavigator from './src/navigation/RootNavigator';
 import { PushNotificationPayload, subscribeToPushNotifications } from './src/lib/push';
 
@@ -61,12 +62,18 @@ const hydrateNotificationsForSignedInUser = async () => {
   const appState = useAppStore.getState();
 
   if (role === 'provider') {
-    await appState.hydrateProviderNotifications();
+    await Promise.allSettled([
+      appState.hydrateProviderNotifications({ force: true }),
+      useBookingDataStore.getState().loadMyBookings({ force: true }),
+    ]);
     return;
   }
 
   if (role === 'customer') {
-    await appState.hydrateCustomerNotifications();
+    await Promise.allSettled([
+      appState.hydrateCustomerNotifications({ force: true }),
+      useBookingDataStore.getState().loadMyBookings({ force: true }),
+    ]);
   }
 };
 
@@ -114,7 +121,7 @@ const navigateFromPushPayload = (payload: PushNotificationPayload | null) => {
 
 export default function App() {
   const [isBootstrapped, setIsBootstrapped] = useState(false);
-  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const themeMode = useAppStore((state) => state.theme);
   const [navigationReady, setNavigationReady] = useState(false);
   const [pendingRecoveryToken, setPendingRecoveryToken] = useState<string | null>(null);
   const [pendingPushPayload, setPendingPushPayload] = useState<PushNotificationPayload | null | undefined>(undefined);
@@ -144,7 +151,6 @@ export default function App() {
           return;
         }
 
-        setThemeMode(savedTheme);
         setIsBootstrapped(true);
         void SplashScreen.hideAsync().catch(() => undefined);
       } catch (error) {
@@ -235,7 +241,6 @@ export default function App() {
       <SafeAreaProvider>
         <NavigationContainer
           ref={navigationRef}
-          key={themeMode}
           onReady={() => setNavigationReady(true)}
         >
           <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />

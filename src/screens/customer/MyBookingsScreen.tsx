@@ -87,12 +87,12 @@ export default function MyBookingsScreen({ navigation, route }: any) {
   useFocusEffect(
     useCallback(() => {
       if (!isLoggedIn) return;
-      void loadMyBookings({ force: true });
+      void loadMyBookings();
     }, [isLoggedIn, loadMyBookings])
   );
 
   useEffect(() => {
-    hydrateCustomerNotifications({ force: true });
+    void hydrateCustomerNotifications();
   }, [hydrateCustomerNotifications]);
 
   const bookings = useMemo(

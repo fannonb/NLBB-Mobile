@@ -165,7 +165,7 @@ export default function AppointmentsScreen({ navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      void loadMyBookings({ force: true });
+      void loadMyBookings();
     }, [loadMyBookings])
   );
 

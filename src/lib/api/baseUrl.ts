@@ -9,21 +9,29 @@ const normalizePath = (path: string) => (path.startsWith('/') ? path.slice(1) : 
 const buildUrl = (baseUrl: string, path: string) => `${baseUrl}/${normalizePath(path)}`;
 
 const withTimeout = async (url: string, init: RequestInit, timeoutMs: number): Promise<Response> => {
+  const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | null = null;
+  const abortFromCaller = () => controller.abort();
 
   try {
-    return await Promise.race([
-      fetch(url, init),
-      new Promise<Response>((_, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error(`Request timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-      }),
-    ]);
+    if (init.signal?.aborted) {
+      controller.abort();
+    } else {
+      init.signal?.addEventListener('abort', abortFromCaller, { once: true });
+    }
+
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted && !init.signal?.aborted) {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
   } finally {
     if (timer) {
       clearTimeout(timer);
     }
+    init.signal?.removeEventListener('abort', abortFromCaller);
   }
 };
 

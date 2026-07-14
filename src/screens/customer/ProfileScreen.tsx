@@ -322,7 +322,7 @@ export default function ProfileScreen({ navigation }: any) {
 
       setUploadingAvatar(true);
       await authApi.uploadAvatar({ dataUri: `data:${mimeType};base64,${asset.base64}` });
-      await refreshCurrentUser();
+      await refreshCurrentUser({ force: true });
       showSuccess('Photo Updated', 'Profile photo updated.');
     } catch (error) {
       const message =

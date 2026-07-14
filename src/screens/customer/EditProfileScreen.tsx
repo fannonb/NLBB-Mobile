@@ -260,7 +260,7 @@ export default function EditProfileScreen({ navigation }: any) {
       const dataUri = `data:${mimeType};base64,${asset.base64}`;
       const updatedUser = await authApi.uploadAvatar({ dataUri });
       setForm((f) => ({ ...f, avatar: updatedUser.avatar ?? f.avatar }));
-      await refreshCurrentUser();
+      await refreshCurrentUser({ force: true });
     } catch (error) {
       const message =
         isApiClientError(error) ? error.message : error instanceof Error ? error.message : 'Failed to upload image';
@@ -313,7 +313,7 @@ export default function EditProfileScreen({ navigation }: any) {
         phone: updatedUser.phone ?? '',
         avatar: updatedUser.avatar ?? undefined,
       });
-      await refreshCurrentUser();
+      await refreshCurrentUser({ force: true });
       showSuccess('Success', 'Profile updated successfully');
       setTimeout(() => {
         navigation.goBack();

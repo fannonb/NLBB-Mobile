@@ -3,7 +3,13 @@ import { User, UserRole } from '../types';
 import { applyThemeMode } from '../constants/theme';
 import { isApiClientError } from '../lib/api/client';
 import { authApi, AuthSessionResponse, BackendUserProfile } from '../lib/api/auth';
-import { clearStoredSession, getStoredSession, setStoredSession } from '../lib/authSession';
+import {
+  clearStoredAuth,
+  getStoredSession,
+  getStoredUser,
+  setStoredSession,
+  setStoredUser,
+} from '../lib/authSession';
 import { preferencesApi } from '../lib/api/preferences';
 import { saveThemePreference } from '../lib/themePreference';
 import {
@@ -25,7 +31,7 @@ interface AuthState {
   isInitializing: boolean;
   isReady: boolean;
   initialize: () => Promise<void>;
-  refreshCurrentUser: () => Promise<void>;
+  refreshCurrentUser: (options?: { force?: boolean }) => Promise<void>;
   login: (
     email: string,
     password: string,
@@ -72,10 +78,11 @@ const mapBackendUserToAppUser = (profile: BackendUserProfile): User => ({
   location: profile.location ?? undefined,
 });
 
-const LOGOUT_NETWORK_TIMEOUT_MS = 1500;
-
 let initialized = false;
 let initializePromise: Promise<void> | null = null;
+let refreshUserPromise: Promise<void> | null = null;
+let lastUserRefreshAt = 0;
+const USER_REFRESH_COOLDOWN_MS = 30_000;
 
 const persistSession = async (session: AuthSessionResponse) => {
   await setStoredSession({
@@ -104,14 +111,16 @@ const hydrateUserPreferences = async () => {
   void registerForPushNotificationsAsync();
 };
 
-const syncSignedInAppState = async (user: User) => {
+const warmSignedInAppState = (user: User) => {
   const appState = useAppStore.getState();
   const bookingState = useBookingDataStore.getState();
   appState.resetSessionState();
   bookingState.resetBookings();
-  await hydrateUserPreferences();
-  await appState.hydrateSessionState(user.role);
-  void bookingState.loadMyBookings({ force: true });
+  void Promise.allSettled([
+    hydrateUserPreferences(),
+    appState.hydrateSessionState(user.role),
+    bookingState.loadMyBookings(),
+  ]);
 };
 
 const resetSignedOutState = () => {
@@ -119,24 +128,36 @@ const resetSignedOutState = () => {
   useBookingDataStore.getState().resetBookings();
 };
 
+const persistUser = (user: User) => {
+  void setStoredUser(user);
+};
+
+const invalidateLocalSession = (set: (state: Partial<AuthState>) => void) => {
+  lastUserRefreshAt = 0;
+  set({ user: null, isLoggedIn: false, isInitializing: false, isReady: true });
+  resetSignedOutState();
+  void clearStoredAuth();
+};
+
 const applySession = async (set: (state: Partial<AuthState>) => void, session: AuthSessionResponse) => {
   if (!session.user) {
-    await clearStoredSession();
+    void clearStoredAuth();
     set({ user: null, isLoggedIn: false });
     return null;
   }
 
   if (isBlockedSeededProfile(session.user)) {
-    await clearStoredSession();
+    void clearStoredAuth();
     set({ user: null, isLoggedIn: false });
     return null;
   }
 
-  await persistSession(session);
-
   const user = mapBackendUserToAppUser(session.user);
+  lastUserRefreshAt = Date.now();
   set({ user, isLoggedIn: true });
-  await syncSignedInAppState(user);
+  void persistSession(session);
+  persistUser(user);
+  warmSignedInAppState(user);
   return user;
 };
 
@@ -161,39 +182,66 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     initializePromise = (async () => {
       try {
-        const session = await getStoredSession();
+        const [session, cachedUser] = await Promise.all([
+          getStoredSession(),
+          getStoredUser(),
+        ]);
         if (!session) {
-          set({ user: null, isLoggedIn: false });
+          set({ user: null, isLoggedIn: false, isReady: true, isInitializing: false });
+          void setStoredUser(null);
           return;
         }
 
         const demoUser = ENABLE_DEMO_MODE ? getDemoUserFromToken(session.accessToken) : null;
         if (demoUser) {
           resetDemoState();
-          set({ user: demoUser, isLoggedIn: true });
+          set({ user: demoUser, isLoggedIn: true, isReady: true, isInitializing: false });
           return;
         }
 
-        const profile = await authApi.getMe();
-        if (!profile) {
-          await clearStoredSession();
-          set({ user: null, isLoggedIn: false });
-          return;
+        set({
+          user: cachedUser,
+          isLoggedIn: cachedUser !== null,
+          isReady: true,
+          isInitializing: false,
+        });
+        if (cachedUser) {
+          lastUserRefreshAt = Date.now();
+          warmSignedInAppState(cachedUser);
         }
 
-        if (isBlockedSeededProfile(profile)) {
-          await clearStoredSession();
-          set({ user: null, isLoggedIn: false });
-          return;
-        }
+        void (async () => {
+          try {
+            const profile = await authApi.getMe();
+            const currentSession = await getStoredSession();
+            if (currentSession?.accessToken !== session.accessToken) {
+              return;
+            }
+            if (!profile || isBlockedSeededProfile(profile)) {
+              invalidateLocalSession(set);
+              return;
+            }
 
-        const user = mapBackendUserToAppUser(profile);
-        set({ user, isLoggedIn: true });
-        await syncSignedInAppState(user);
+            const user = mapBackendUserToAppUser(profile);
+            set({ user, isLoggedIn: true });
+            lastUserRefreshAt = Date.now();
+            persistUser(user);
+            if (!cachedUser) {
+              warmSignedInAppState(user);
+            }
+          } catch (error) {
+            const currentSession = await getStoredSession();
+            if (
+              currentSession?.accessToken === session.accessToken &&
+              isApiClientError(error) &&
+              (error.status === 401 || error.status === 403)
+            ) {
+              invalidateLocalSession(set);
+            }
+          }
+        })();
       } catch {
-        await clearStoredSession();
-        set({ user: null, isLoggedIn: false });
-        resetSignedOutState();
+        set({ user: null, isLoggedIn: false, isReady: true, isInitializing: false });
       } finally {
         set({ isInitializing: false, isReady: true });
       }
@@ -202,7 +250,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await initializePromise;
   },
 
-  refreshCurrentUser: async () => {
+  refreshCurrentUser: async (options) => {
+    if (!options?.force && Date.now() - lastUserRefreshAt < USER_REFRESH_COOLDOWN_MS) {
+      return;
+    }
+    if (refreshUserPromise) {
+      return refreshUserPromise;
+    }
+
+    refreshUserPromise = (async () => {
     const session = await getStoredSession();
     if (!session) {
       set({ user: null, isLoggedIn: false });
@@ -211,26 +267,39 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       const profile = await authApi.getMe();
+      const currentSession = await getStoredSession();
+      if (currentSession?.accessToken !== session.accessToken) {
+        return;
+      }
       if (!profile) {
-        await clearStoredSession();
-        set({ user: null, isLoggedIn: false });
+        invalidateLocalSession(set);
         return;
       }
 
       if (isBlockedSeededProfile(profile)) {
-        await clearStoredSession();
-        set({ user: null, isLoggedIn: false });
+        invalidateLocalSession(set);
         return;
       }
 
       const user = mapBackendUserToAppUser(profile);
       set({ user, isLoggedIn: true });
-      await syncSignedInAppState(user);
-    } catch {
-      await clearStoredSession();
-      set({ user: null, isLoggedIn: false });
-      resetSignedOutState();
-    }
+      persistUser(user);
+      lastUserRefreshAt = Date.now();
+    } catch (error) {
+      const currentSession = await getStoredSession();
+      if (
+        currentSession?.accessToken === session.accessToken &&
+        isApiClientError(error) &&
+        (error.status === 401 || error.status === 403)
+      ) {
+        invalidateLocalSession(set);
+      }
+      } finally {
+        refreshUserPromise = null;
+      }
+    })();
+
+    return refreshUserPromise;
   },
 
   login: async (email: string, password: string, expectedRole?: UserRole) => {
@@ -256,8 +325,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email: email.trim(),
         password,
       });
-      const user = await applySession(set, session);
-      const role = user?.role ?? session.user?.role ?? null;
+      const role = session.user?.role ?? null;
 
       if (session.user && isBlockedSeededProfile(session.user)) {
         return {
@@ -268,8 +336,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (expectedRole && role && role !== expectedRole) {
-        await authApi.logout().catch(() => undefined);
-        await clearStoredSession();
+        void authApi.logoutWithAccessToken(session.accessToken).catch(() => undefined);
+        void clearStoredAuth();
         set({ user: null, isLoggedIn: false });
         resetSignedOutState();
         return {
@@ -279,7 +347,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         };
       }
 
-      return { success: true, role };
+      const user = await applySession(set, session);
+
+      return { success: true, role: user?.role ?? role };
     } catch (error) {
       const message =
         isApiClientError(error)
@@ -338,21 +408,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    const session = await getStoredSession();
-    const isDemo = ENABLE_DEMO_MODE && session ? getDemoUserFromToken(session.accessToken) !== null : false;
-
-    const logoutPromise =
-      !isDemo && session?.accessToken
-        ? Promise.race([
-            authApi.logoutWithAccessToken(session.accessToken),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), LOGOUT_NETWORK_TIMEOUT_MS)),
-          ]).catch(() => undefined)
-        : Promise.resolve();
-
-    await clearStoredSession();
-    set({ user: null, isLoggedIn: false });
+    lastUserRefreshAt = 0;
+    const sessionPromise = getStoredSession();
+    set({ user: null, isLoggedIn: false, isInitializing: false, isReady: true });
     resetSignedOutState();
+    void clearStoredAuth();
 
-    void logoutPromise;
+    void sessionPromise.then((session) => {
+      const isDemo = ENABLE_DEMO_MODE && session
+        ? getDemoUserFromToken(session.accessToken) !== null
+        : false;
+      if (!isDemo && session?.accessToken) {
+        void authApi.logoutWithAccessToken(session.accessToken).catch(() => undefined);
+      }
+    });
   },
 }));

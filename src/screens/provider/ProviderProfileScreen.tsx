@@ -483,7 +483,7 @@ export default function ProviderProfileScreen({ navigation }: any) {
           location: resolvedLocationLabel || undefined,
           avatar: form.avatar.trim() || undefined,
         });
-        await refreshCurrentUser();
+        await refreshCurrentUser({ force: true });
       } catch (error: any) {
         accountSyncError = error?.message ?? 'Account details could not be saved.';
       }

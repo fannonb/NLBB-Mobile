@@ -67,6 +67,15 @@ const defaultHeaders = {
   'Content-Type': 'application/json',
 };
 
+const canRefreshAfterUnauthorized = (path: string) =>
+  ![
+    'auth/login',
+    'auth/register',
+    'auth/refresh',
+    'auth/forgot-password',
+    'auth/reset-password',
+  ].some((publicAuthPath) => path.startsWith(publicAuthPath));
+
 const request = async <T>(
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
   path: string,
@@ -122,7 +131,7 @@ const request = async <T>(
     payload = null;
   }
 
-  if (response.status === 401 && retryOnUnauthorized && !path.startsWith('auth/')) {
+  if (response.status === 401 && retryOnUnauthorized && canRefreshAfterUnauthorized(path)) {
     const refreshed = await refreshStoredSession();
     if (refreshed) {
       return request<T>(method, path, body, false);

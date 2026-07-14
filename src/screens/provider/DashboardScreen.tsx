@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -409,6 +409,7 @@ export default function DashboardScreen({ navigation }: any) {
   const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
   const updateBookingStatus = useBookingDataStore((state) => state.updateBookingStatus);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const hasLoadedProfile = useRef(false);
   const [togglingOpen, setTogglingOpen] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
@@ -420,10 +421,13 @@ export default function DashboardScreen({ navigation }: any) {
 
   const loadDashboardData = useCallback(async (active?: { current: boolean }) => {
     const isActive = () => (active ? active.current : true);
-    setLoadingProfile(true);
+    if (!hasLoadedProfile.current) {
+      setLoadingProfile(true);
+    }
+    void hydrateProviderNotifications();
     try {
       const [, provider] = await Promise.all([
-        loadMyBookings({ force: true }),
+        loadMyBookings(),
         providerManagementApi.getMyProfile().catch(() => null),
       ]);
       if (!isActive()) return;
@@ -445,11 +449,11 @@ export default function DashboardScreen({ navigation }: any) {
           isOpen: provider.isOpen ?? true,
         });
       }
-      await hydrateProviderNotifications({ force: true });
     } catch {
       // Keep current dashboard data visible when a refresh fails.
     } finally {
       if (isActive()) {
+        hasLoadedProfile.current = true;
         setLoadingProfile(false);
       }
     }
@@ -469,7 +473,7 @@ export default function DashboardScreen({ navigation }: any) {
     () => bookingRecords.map((booking) => toProviderAppointmentCard(booking)),
     [bookingRecords]
   );
-  const loading = loadingProfile || bookingsLoading || bookingsLoadedAt === 0;
+  const loading = bookingRecords.length === 0 && (loadingProfile || bookingsLoading || bookingsLoadedAt === 0);
   const pending = appointments.filter((a) => a.status === 'pending');
   const upcomingAppointments = [...appointments]
     .filter((a) => a.status === 'upcoming')

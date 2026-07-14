@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { ThemeMode } from '../constants/theme';
 import { Service, Booking, Review, Notification, UserRole } from '../types';
-import { getStoredSession } from '../lib/authSession';
+import { getStoredSession, getStoredUser } from '../lib/authSession';
+import { safeStorage } from '../lib/safeStorage';
 import { favoritesApi } from '../lib/api/favorites';
 import { notificationsApi } from '../lib/api/notifications';
 import { DEFAULT_NOTIFICATION_SETTINGS, NotificationSettings } from '../lib/api/preferences';
@@ -53,7 +54,16 @@ const DEFAULT_WORKING_HOURS: WorkingHours[] = [
 
 const DEFAULT_PROVIDER_COVER =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
-const HYDRATION_COOLDOWN_MS = 10_000;
+const HYDRATION_COOLDOWN_MS = 30_000;
+const FAVORITES_SNAPSHOT_KEY = 'nlbb_favorites_snapshot_v1';
+const CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY = 'nlbb_customer_notifications_snapshot_v1';
+const PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY = 'nlbb_provider_notifications_snapshot_v1';
+
+interface AccountSnapshot<T> {
+  userId: string;
+  data: T;
+  savedAt: number;
+}
 
 let favoritesHydrationPromise: Promise<void> | null = null;
 let customerNotificationsHydrationPromise: Promise<void> | null = null;
@@ -64,6 +74,27 @@ let lastProviderNotificationsHydratedAt = 0;
 let favoritesMutationVersion = 0;
 let customerNotificationsMutationVersion = 0;
 let providerNotificationsMutationVersion = 0;
+let favoritesSnapshotUserId: string | null = null;
+let customerNotificationsSnapshotUserId: string | null = null;
+let providerNotificationsSnapshotUserId: string | null = null;
+
+const readAccountSnapshot = async <T>(key: string, userId: string): Promise<AccountSnapshot<T> | null> => {
+  const raw = await safeStorage.getItem(key);
+  if (!raw) return null;
+  try {
+    const snapshot = JSON.parse(raw) as AccountSnapshot<T>;
+    return snapshot.userId === userId ? snapshot : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistAccountSnapshot = async <T>(key: string, data: T) => {
+  const user = await getStoredUser();
+  if (!user) return;
+  const snapshot: AccountSnapshot<T> = { userId: user.id, data, savedAt: Date.now() };
+  await safeStorage.setItem(key, JSON.stringify(snapshot));
+};
 
 const hasFreshData = (lastHydratedAt: number) =>
   lastHydratedAt > 0 && Date.now() - lastHydratedAt < HYDRATION_COOLDOWN_MS;
@@ -75,9 +106,14 @@ const resetHydrationState = () => {
   lastFavoritesHydratedAt = 0;
   lastCustomerNotificationsHydratedAt = 0;
   lastProviderNotificationsHydratedAt = 0;
-  favoritesMutationVersion = 0;
-  customerNotificationsMutationVersion = 0;
-  providerNotificationsMutationVersion = 0;
+  // Never reuse a generation. Requests from a previous session must not be
+  // allowed to write into the next signed-in user's state.
+  favoritesMutationVersion += 1;
+  customerNotificationsMutationVersion += 1;
+  providerNotificationsMutationVersion += 1;
+  favoritesSnapshotUserId = null;
+  customerNotificationsSnapshotUserId = null;
+  providerNotificationsSnapshotUserId = null;
 };
 
 const noteFavoritesMutation = () => {
@@ -188,28 +224,36 @@ export const useAppStore = create<AppState>((set, get) => ({
   addFavorite: async (providerId) => {
     const previous = get().favorites;
     noteFavoritesMutation();
+    const operationVersion = favoritesMutationVersion;
     set((state) => ({
       favorites: state.favorites.includes(providerId) ? state.favorites : [...state.favorites, providerId],
     }));
+    void persistAccountSnapshot(FAVORITES_SNAPSHOT_KEY, get().favorites);
     try {
       await favoritesApi.addFavorite(providerId);
     } catch (err) {
       console.warn('[appStore] addFavorite failed, reverting optimistic update:', err);
+      if (operationVersion !== favoritesMutationVersion) return;
       noteFavoritesMutation();
       set({ favorites: previous });
+      void persistAccountSnapshot(FAVORITES_SNAPSHOT_KEY, previous);
     }
   },
 
   removeFavorite: async (providerId) => {
     const previous = get().favorites;
     noteFavoritesMutation();
+    const operationVersion = favoritesMutationVersion;
     set((state) => ({ favorites: state.favorites.filter((id) => id !== providerId) }));
+    void persistAccountSnapshot(FAVORITES_SNAPSHOT_KEY, get().favorites);
     try {
       await favoritesApi.removeFavorite(providerId);
     } catch (err) {
       console.warn('[appStore] removeFavorite failed, reverting optimistic update:', err);
+      if (operationVersion !== favoritesMutationVersion) return;
       noteFavoritesMutation();
       set({ favorites: previous });
+      void persistAccountSnapshot(FAVORITES_SNAPSHOT_KEY, previous);
     }
   },
 
@@ -227,12 +271,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       return favoritesHydrationPromise;
     }
 
-    favoritesHydrationPromise = (async () => {
+    let request!: Promise<void>;
+    request = (async () => {
       const startedAtVersion = favoritesMutationVersion;
       try {
         const session = await getStoredSession();
         if (!session?.accessToken) {
           return;
+        }
+
+        const user = await getStoredUser();
+        if (user && favoritesSnapshotUserId !== user.id) {
+          favoritesSnapshotUserId = user.id;
+          const snapshot = await readAccountSnapshot<string[]>(FAVORITES_SNAPSHOT_KEY, user.id);
+          if (snapshot && startedAtVersion === favoritesMutationVersion && get().favorites.length === 0) {
+            set({ favorites: snapshot.data });
+          }
         }
 
         if (hasFreshData(lastFavoritesHydratedAt)) {
@@ -241,17 +295,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         const backendFavorites = await favoritesApi.listFavorites();
         if (startedAtVersion === favoritesMutationVersion) {
-          set({ favorites: backendFavorites.map((provider) => provider.id) });
+          const nextFavorites = backendFavorites.map((provider) => provider.id);
+          set({ favorites: nextFavorites });
+          void persistAccountSnapshot(FAVORITES_SNAPSHOT_KEY, nextFavorites);
+          lastFavoritesHydratedAt = Date.now();
         }
-        lastFavoritesHydratedAt = Date.now();
       } catch {
         // Ignore load failures and keep current state.
       } finally {
-        favoritesHydrationPromise = null;
+        if (favoritesHydrationPromise === request) {
+          favoritesHydrationPromise = null;
+        }
       }
     })();
+    favoritesHydrationPromise = request;
 
-    return favoritesHydrationPromise;
+    return request;
   },
 
   addBooking: (booking) =>
@@ -269,12 +328,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       return customerNotificationsHydrationPromise;
     }
 
-    customerNotificationsHydrationPromise = (async () => {
+    let request!: Promise<void>;
+    request = (async () => {
       const startedAtVersion = customerNotificationsMutationVersion;
       try {
         const session = await getStoredSession();
         if (!session?.accessToken) {
           return;
+        }
+
+        const user = await getStoredUser();
+        if (user && customerNotificationsSnapshotUserId !== user.id) {
+          customerNotificationsSnapshotUserId = user.id;
+          const snapshot = await readAccountSnapshot<Notification[]>(CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY, user.id);
+          if (snapshot && startedAtVersion === customerNotificationsMutationVersion && get().customerNotifications.length === 0) {
+            set({ customerNotifications: snapshot.data });
+          }
         }
 
         if (!options?.force && hasFreshData(lastCustomerNotificationsHydratedAt)) {
@@ -284,56 +353,70 @@ export const useAppStore = create<AppState>((set, get) => ({
         const notifications = await notificationsApi.listMyNotifications();
         if (startedAtVersion === customerNotificationsMutationVersion) {
           set({ customerNotifications: notifications });
+          void persistAccountSnapshot(CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY, notifications);
+          lastCustomerNotificationsHydratedAt = Date.now();
         }
-        lastCustomerNotificationsHydratedAt = Date.now();
       } catch {
         // Ignore load failures and keep current state.
       } finally {
-        customerNotificationsHydrationPromise = null;
+        if (customerNotificationsHydrationPromise === request) {
+          customerNotificationsHydrationPromise = null;
+        }
       }
     })();
+    customerNotificationsHydrationPromise = request;
 
-    return customerNotificationsHydrationPromise;
+    return request;
   },
 
   markCustomerNotificationRead: async (id) => {
     const previous = get().customerNotifications;
     noteCustomerNotificationsMutation();
+    const operationVersion = customerNotificationsMutationVersion;
     set((state) => ({
       customerNotifications: state.customerNotifications.map((notification) =>
         notification.id === id ? { ...notification, isRead: true } : notification
       ),
     }));
+    void persistAccountSnapshot(CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY, get().customerNotifications);
 
     try {
       const updated = await notificationsApi.markNotificationRead(id);
+      if (operationVersion !== customerNotificationsMutationVersion) return;
       noteCustomerNotificationsMutation();
       set((state) => ({
         customerNotifications: state.customerNotifications.map((notification) =>
           notification.id === id ? updated : notification
         ),
       }));
+      void persistAccountSnapshot(CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY, get().customerNotifications);
     } catch {
+      if (operationVersion !== customerNotificationsMutationVersion) return;
       noteCustomerNotificationsMutation();
       set({ customerNotifications: previous });
+      void persistAccountSnapshot(CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY, previous);
     }
   },
 
   markAllCustomerNotificationsRead: async () => {
     const previous = get().customerNotifications;
     noteCustomerNotificationsMutation();
+    const operationVersion = customerNotificationsMutationVersion;
     set((state) => ({
       customerNotifications: state.customerNotifications.map((notification) => ({
         ...notification,
         isRead: true,
       })),
     }));
+    void persistAccountSnapshot(CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY, get().customerNotifications);
 
     try {
       await notificationsApi.markAllNotificationsRead();
     } catch {
+      if (operationVersion !== customerNotificationsMutationVersion) return;
       noteCustomerNotificationsMutation();
       set({ customerNotifications: previous });
+      void persistAccountSnapshot(CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY, previous);
     }
   },
 
@@ -351,12 +434,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       return providerNotificationsHydrationPromise;
     }
 
-    providerNotificationsHydrationPromise = (async () => {
+    let request!: Promise<void>;
+    request = (async () => {
       const startedAtVersion = providerNotificationsMutationVersion;
       try {
         const session = await getStoredSession();
         if (!session?.accessToken) {
           return;
+        }
+
+        const user = await getStoredUser();
+        if (user && providerNotificationsSnapshotUserId !== user.id) {
+          providerNotificationsSnapshotUserId = user.id;
+          const snapshot = await readAccountSnapshot<ProviderNotification[]>(PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY, user.id);
+          if (snapshot && startedAtVersion === providerNotificationsMutationVersion && get().providerNotifications.length === 0) {
+            set({ providerNotifications: snapshot.data });
+          }
         }
 
         if (!options?.force && hasFreshData(lastProviderNotificationsHydratedAt)) {
@@ -365,17 +458,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         const notifications = await notificationsApi.listMyNotifications();
         if (startedAtVersion === providerNotificationsMutationVersion) {
-          set({ providerNotifications: notifications.map(toProviderNotification) });
+          const nextNotifications = notifications.map(toProviderNotification);
+          set({ providerNotifications: nextNotifications });
+          void persistAccountSnapshot(PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY, nextNotifications);
+          lastProviderNotificationsHydratedAt = Date.now();
         }
-        lastProviderNotificationsHydratedAt = Date.now();
       } catch {
         // Ignore load failures and keep current state.
       } finally {
-        providerNotificationsHydrationPromise = null;
+        if (providerNotificationsHydrationPromise === request) {
+          providerNotificationsHydrationPromise = null;
+        }
       }
     })();
+    providerNotificationsHydrationPromise = request;
 
-    return providerNotificationsHydrationPromise;
+    return request;
   },
 
   addService: (service) =>
@@ -407,14 +505,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   markProviderNotificationRead: async (id) => {
     const previous = get().providerNotifications;
     noteProviderNotificationsMutation();
+    const operationVersion = providerNotificationsMutationVersion;
     set((state) => ({
       providerNotifications: state.providerNotifications.map((notification) =>
         notification.id === id ? { ...notification, isRead: true } : notification
       ),
     }));
+    void persistAccountSnapshot(PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY, get().providerNotifications);
 
     try {
       const updated = await notificationsApi.markNotificationRead(id);
+      if (operationVersion !== providerNotificationsMutationVersion) return;
       const normalized = toProviderNotification(updated);
       noteProviderNotificationsMutation();
       set((state) => ({
@@ -422,27 +523,34 @@ export const useAppStore = create<AppState>((set, get) => ({
           notification.id === id ? normalized : notification
         ),
       }));
+      void persistAccountSnapshot(PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY, get().providerNotifications);
     } catch {
+      if (operationVersion !== providerNotificationsMutationVersion) return;
       noteProviderNotificationsMutation();
       set({ providerNotifications: previous });
+      void persistAccountSnapshot(PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY, previous);
     }
   },
 
   markAllProviderNotificationsRead: async () => {
     const previous = get().providerNotifications;
     noteProviderNotificationsMutation();
+    const operationVersion = providerNotificationsMutationVersion;
     set((state) => ({
       providerNotifications: state.providerNotifications.map((notification) => ({
         ...notification,
         isRead: true,
       })),
     }));
+    void persistAccountSnapshot(PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY, get().providerNotifications);
 
     try {
       await notificationsApi.markAllNotificationsRead();
     } catch {
+      if (operationVersion !== providerNotificationsMutationVersion) return;
       noteProviderNotificationsMutation();
       set({ providerNotifications: previous });
+      void persistAccountSnapshot(PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY, previous);
     }
   },
 

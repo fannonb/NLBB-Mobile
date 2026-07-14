@@ -4,7 +4,8 @@ import {
   BookingRecord,
   UpdateBookingStatusPayload,
 } from '../lib/api/bookings';
-import { getStoredSession } from '../lib/authSession';
+import { getStoredSession, getStoredUser } from '../lib/authSession';
+import { safeStorage } from '../lib/safeStorage';
 
 interface BookingDataState {
   records: BookingRecord[];
@@ -20,10 +21,18 @@ interface BookingDataState {
   resetBookings: () => void;
 }
 
-const BOOKING_CACHE_MS = 5_000;
+const BOOKING_CACHE_MS = 30_000;
+const BOOKING_SNAPSHOT_KEY = 'nlbb_booking_snapshot_v1';
+
+interface BookingSnapshot {
+  userId: string;
+  records: BookingRecord[];
+  savedAt: number;
+}
 
 let loadPromise: Promise<BookingRecord[]> | null = null;
 let mutationVersion = 0;
+let snapshotHydratedForUserId: string | null = null;
 
 const isFresh = (loadedAt: number) =>
   loadedAt > 0 && Date.now() - loadedAt < BOOKING_CACHE_MS;
@@ -38,6 +47,24 @@ const mergeBooking = (records: BookingRecord[], updated: BookingRecord) => {
 
 const errorMessageFor = (error: unknown) =>
   error instanceof Error ? error.message : 'Unable to refresh bookings right now.';
+
+const readBookingSnapshot = async (userId: string): Promise<BookingSnapshot | null> => {
+  const raw = await safeStorage.getItem(BOOKING_SNAPSHOT_KEY);
+  if (!raw) return null;
+  try {
+    const snapshot = JSON.parse(raw) as BookingSnapshot;
+    return snapshot.userId === userId && Array.isArray(snapshot.records) ? snapshot : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistBookingSnapshot = async (records: BookingRecord[]) => {
+  const user = await getStoredUser();
+  if (!user) return;
+  const snapshot: BookingSnapshot = { userId: user.id, records, savedAt: Date.now() };
+  await safeStorage.setItem(BOOKING_SNAPSHOT_KEY, JSON.stringify(snapshot));
+};
 
 export const useBookingDataStore = create<BookingDataState>((set, get) => ({
   records: [],
@@ -55,12 +82,24 @@ export const useBookingDataStore = create<BookingDataState>((set, get) => ({
       return loadPromise;
     }
 
-    loadPromise = (async () => {
+    let request!: Promise<BookingRecord[]>;
+    request = (async () => {
       const startedAtVersion = mutationVersion;
       const session = await getStoredSession();
       if (!session?.accessToken) {
-        set({ loading: false, error: null });
+        if (startedAtVersion === mutationVersion) {
+          set({ loading: false, error: null });
+        }
         return [];
+      }
+
+      const user = await getStoredUser();
+      if (user && snapshotHydratedForUserId !== user.id) {
+        snapshotHydratedForUserId = user.id;
+        const snapshot = await readBookingSnapshot(user.id);
+        if (snapshot && startedAtVersion === mutationVersion && get().records.length === 0) {
+          set({ records: snapshot.records, loadedAt: snapshot.savedAt, error: null });
+        }
       }
 
       set((state) => ({
@@ -76,32 +115,45 @@ export const useBookingDataStore = create<BookingDataState>((set, get) => ({
             loadedAt: Date.now(),
             error: null,
           });
+          void persistBookingSnapshot(nextRecords);
         }
         return nextRecords;
       } catch (error) {
-        set({
-          error: errorMessageFor(error),
-          // Keep existing records visible; emptying on transient failures causes flicker.
-          loading: false,
-        });
+        if (startedAtVersion === mutationVersion) {
+          set({
+            error: errorMessageFor(error),
+            // Keep existing records visible; emptying on transient failures causes flicker.
+            loading: false,
+          });
+        }
         return get().records;
       } finally {
-        set({ loading: false });
-        loadPromise = null;
+        if (startedAtVersion === mutationVersion) {
+          set({ loading: false });
+        }
+        if (loadPromise === request) {
+          loadPromise = null;
+        }
       }
     })();
+    loadPromise = request;
 
-    return loadPromise;
+    return request;
   },
 
   updateBookingStatus: async (bookingId, status) => {
     mutationVersion += 1;
+    const operationVersion = mutationVersion;
     const updated = await bookingApi.updateBookingStatus(bookingId, status);
+    if (operationVersion !== mutationVersion) {
+      return updated;
+    }
     set((state) => ({
       records: mergeBooking(state.records, updated),
       loadedAt: Date.now(),
       error: null,
     }));
+    void persistBookingSnapshot(get().records);
     return updated;
   },
 
@@ -112,11 +164,13 @@ export const useBookingDataStore = create<BookingDataState>((set, get) => ({
       loadedAt: Date.now(),
       error: null,
     }));
+    void persistBookingSnapshot(get().records);
   },
 
   resetBookings: () => {
     loadPromise = null;
-    mutationVersion = 0;
+    mutationVersion += 1;
+    snapshotHydratedForUserId = null;
     set({
       records: [],
       loading: false,

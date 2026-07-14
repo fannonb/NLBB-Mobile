@@ -85,7 +85,7 @@ export default function NotificationsScreen({ navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      void hydrateCustomerNotifications({ force: true });
+      void hydrateCustomerNotifications();
     }, [hydrateCustomerNotifications])
   );
 

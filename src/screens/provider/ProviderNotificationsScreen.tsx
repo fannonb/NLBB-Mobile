@@ -96,7 +96,7 @@ export default function ProviderNotificationsScreen({ navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      void hydrateProviderNotifications({ force: true });
+      void hydrateProviderNotifications();
     }, [hydrateProviderNotifications])
   );
 
