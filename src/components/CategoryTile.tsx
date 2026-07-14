@@ -6,13 +6,13 @@ import { getCategoryVisual } from '../constants/categoryVisuals';
 import { useThemedColors } from '../hooks/useThemedColors';
 
 interface CategoryTileProps {
-  category: { id: string; name: string; slug?: string };
+  category: { id: string; name: string; slug?: string; icon?: string };
   onPress: () => void;
 }
 
 export default function CategoryTile({ category, onPress }: CategoryTileProps) {
   const palette = useThemedColors();
-  const visual = getCategoryVisual(category.slug ?? category.name);
+  const visual = getCategoryVisual(category.slug ?? category.name, category.icon);
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={styles.wrapper}>

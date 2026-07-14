@@ -11,7 +11,7 @@ import {
   Switch,
   ActivityIndicator,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
@@ -22,9 +22,10 @@ import Toast from '../../components/Toast';
 import EmptyState from '../../components/EmptyState';
 import { useModalManager } from '../../hooks/useModalManager';
 import { providerManagementApi, ProviderService } from '../../lib/api/providerManagement';
+import { providerApi } from '../../lib/api/providers';
 import { useProviderAddStore } from '../../store/providerAddStore';
-
-const CATEGORIES = ['Hair Styling', 'Coloring', 'Nails', 'Massage', 'Wellness', 'Barber', 'Facial', 'Other'];
+import { Category } from '../../types';
+import { getCategoryVisual } from '../../constants/categoryVisuals';
 
 function createServicesStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
@@ -130,6 +131,7 @@ function createServicesStyles(p: ColorPalette, s: ShadowPalette) {
     catPickerChip: {
       paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.full,
       backgroundColor: p.bg, borderWidth: 1, borderColor: p.border,
+      flexDirection: 'row', alignItems: 'center', gap: 6,
     },
     catPickerChipActive: { backgroundColor: p.gold, borderColor: p.gold },
     catPickerText: { color: p.textSecondary, fontFamily: Fonts.sansMedium, fontSize: 12 },
@@ -152,7 +154,7 @@ const EMPTY_FORM: ServiceForm = {
   price: '',
   duration: '',
   description: '',
-  category: CATEGORIES[0],
+  category: '',
 };
 
 export default function ServicesScreen({ navigation }: any) {
@@ -164,6 +166,7 @@ export default function ServicesScreen({ navigation }: any) {
   const canGoBack = navigation.canGoBack?.() ?? false;
 
   const [services, setServices] = useState<ProviderService[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -197,9 +200,13 @@ export default function ServicesScreen({ navigation }: any) {
     const loadServices = async () => {
       setLoading(true);
       try {
-        const response = await providerManagementApi.listMyServices();
+        const [response, categoryResponse] = await Promise.all([
+          providerManagementApi.listMyServices(),
+          providerApi.listCategories({ force: true }).catch(() => []),
+        ]);
         if (!active) return;
         setServices(response);
+        setAvailableCategories(categoryResponse);
       } catch {
         if (!active) return;
         setServices([]);
@@ -236,7 +243,11 @@ export default function ServicesScreen({ navigation }: any) {
   );
 
   const openAdd = () => {
-    setForm(EMPTY_FORM);
+    if (availableCategories.length === 0) {
+      showError('Categories Unavailable', 'No active service categories are available. Please contact the administrator.');
+      return;
+    }
+    setForm({ ...EMPTY_FORM, category: availableCategories[0].name });
     setIsEditing(false);
     setShowModal(true);
   };
@@ -261,8 +272,8 @@ export default function ServicesScreen({ navigation }: any) {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.price) {
-      showToast('Please fill in name and price.', 'error');
+    if (!form.name.trim() || !form.price || !availableCategories.some((category) => category.name === form.category)) {
+      showToast('Please fill in name, price, and select an active category.', 'error');
       return;
     }
 
@@ -400,11 +411,17 @@ export default function ServicesScreen({ navigation }: any) {
           />
         ) : (
           <>
-            {filtered.map((service) => (
+            {filtered.map((service) => {
+              const serviceCategory = availableCategories.find((category) => category.name === service.category);
+              const serviceVisual = getCategoryVisual(
+                serviceCategory?.slug ?? service.category,
+                serviceCategory?.icon
+              );
+              return (
               <View key={service.id} style={[styles.serviceCard, !service.isActive && styles.serviceCardInactive]}>
                 <View style={styles.serviceLeft}>
                   <View style={[styles.serviceIconWrap, !service.isActive && { opacity: 0.5 }]}>
-                    <Feather name="scissors" size={16} color={palette.gold} />
+                    <MaterialCommunityIcons name={serviceVisual.icon} size={18} color={palette.gold} />
                   </View>
                   <View style={styles.serviceInfo}>
                     <Text style={[styles.serviceName, !service.isActive && styles.inactiveText]}>{service.name}</Text>
@@ -434,7 +451,8 @@ export default function ServicesScreen({ navigation }: any) {
                   </View>
                 </View>
               </View>
-            ))}
+              );
+            })}
 
             <TouchableOpacity onPress={openAdd} style={styles.addServiceBtn}>
               <Feather name="plus-circle" size={20} color={palette.gold} />
@@ -475,17 +493,25 @@ export default function ServicesScreen({ navigation }: any) {
               <View style={styles.modalField}>
                 <Text style={styles.modalLabel}>Category *</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catPickerRow}>
-                  {CATEGORIES.map((cat) => (
+                  {availableCategories.map((category) => {
+                    const visual = getCategoryVisual(category.slug ?? category.name, category.icon);
+                    return (
                     <TouchableOpacity
-                      key={cat}
-                      onPress={() => setForm((current) => ({ ...current, category: cat }))}
-                      style={[styles.catPickerChip, form.category === cat && styles.catPickerChipActive]}
+                      key={category.id}
+                      onPress={() => setForm((current) => ({ ...current, category: category.name }))}
+                      style={[styles.catPickerChip, form.category === category.name && styles.catPickerChipActive]}
                     >
-                      <Text style={[styles.catPickerText, form.category === cat && styles.catPickerTextActive]}>
-                        {cat}
+                      <MaterialCommunityIcons
+                        name={visual.icon}
+                        size={14}
+                        color={form.category === category.name ? palette.bg : palette.textSecondary}
+                      />
+                      <Text style={[styles.catPickerText, form.category === category.name && styles.catPickerTextActive]}>
+                        {category.name}
                       </Text>
                     </TouchableOpacity>
-                  ))}
+                    );
+                  })}
                 </ScrollView>
               </View>
 

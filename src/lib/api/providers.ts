@@ -57,8 +57,8 @@ const listProvidersCached = (filters: ProviderListFilters = {}) => {
   return request;
 };
 
-const listCategoriesCached = () => {
-  if (categoryCache && Date.now() - categoryCache.loadedAt < DIRECTORY_CACHE_MS) {
+const listCategoriesCached = (options: { force?: boolean } = {}) => {
+  if (!options.force && categoryCache && Date.now() - categoryCache.loadedAt < DIRECTORY_CACHE_MS) {
     return Promise.resolve(categoryCache.data);
   }
   if (categoryRequest) return categoryRequest;

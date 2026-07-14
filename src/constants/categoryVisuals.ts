@@ -39,5 +39,13 @@ export const CATEGORY_VISUALS: Record<string, CategoryVisual> = {
   default: define('scissors-cutting', '#B5922A'), // Logo Gold
 };
 
-export const getCategoryVisual = (key: string | undefined): CategoryVisual =>
-  CATEGORY_VISUALS[(key ?? '').toLowerCase()] ?? CATEGORY_VISUALS.default;
+export const getCategoryVisual = (key: string | undefined, configuredIcon?: string): CategoryVisual => {
+  const base = CATEGORY_VISUALS[(key ?? '').toLowerCase()] ?? CATEGORY_VISUALS.default;
+  if (configuredIcon && configuredIcon in MaterialCommunityIcons.glyphMap) {
+    return {
+      ...base,
+      icon: configuredIcon as keyof typeof MaterialCommunityIcons.glyphMap,
+    };
+  }
+  return base;
+};

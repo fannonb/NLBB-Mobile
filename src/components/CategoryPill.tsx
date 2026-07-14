@@ -103,7 +103,7 @@ export default function CategoryPill({
     }).start();
   };
 
-  const visual = getCategoryVisual(category.slug ?? category.name);
+  const visual = getCategoryVisual(category.slug ?? category.name, category.icon);
 
   if (variant === 'chip') {
     const chipIconColor = isActive ? '#FFFFFF' : visual.color;
