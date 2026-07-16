@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
@@ -15,6 +14,8 @@ import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import GoldButton from '../../components/GoldButton';
 import ErrorModal from '../../components/ErrorModal';
 import InfoModal from '../../components/InfoModal';
+import SuccessModal from '../../components/SuccessModal';
+import KeyboardAwareScrollView from '../../components/KeyboardAwareScrollView';
 import { publicConfigApi, PublicReleaseConfig } from '../../lib/api/publicConfig';
 import { subscriptionsApi } from '../../lib/api/subscriptions';
 import { paymentsApi } from '../../lib/api/payments';
@@ -243,8 +244,29 @@ export default function SubscriptionScreen({ navigation }: any) {
     title: '',
     message: '',
   });
+  const [successModal, setSuccessModal] = useState<{ visible: boolean; title: string; message: string }>({
+    visible: false,
+    title: '',
+    message: '',
+  });
+  const awaitingPaymentRef = useRef(false);
+  const pollCancelRef = useRef<(() => void) | null>(null);
+  const paymentBaselineRef = useRef<{
+    renewalDate: string | null;
+    lastPaymentId?: string;
+    wasActive: boolean;
+  } | null>(null);
 
-  const loadData = async (showSpinner = true) => {
+  const isSubscriptionActive = (value: Subscription | null) => {
+    if (!value || value.status !== 'active') {
+      return false;
+    }
+    return new Date(value.renewalDate).getTime() > Date.now();
+  };
+
+  const loadData = async (
+    showSpinner = true
+  ): Promise<{ subscription: Subscription | null; payments: Payment[] } | null> => {
     if (showSpinner) {
       setLoading(true);
     }
@@ -265,12 +287,15 @@ export default function SubscriptionScreen({ navigation }: any) {
       } else if (profile?.phone) {
         setPhone(profile.phone);
       }
+
+      return { subscription: subscriptionRes, payments: paymentsRes };
     } catch (error: any) {
       setErrorModal({
         visible: true,
         title: 'Subscription Error',
         message: error?.message ?? 'Could not load subscription data.',
       });
+      return null;
     } finally {
       if (showSpinner) {
         setLoading(false);
@@ -278,19 +303,24 @@ export default function SubscriptionScreen({ navigation }: any) {
     }
   };
 
+  const loadSubscriptionStatus = async (reconcile = false) => {
+    try {
+      const subscriptionRes = await subscriptionsApi.getMySubscription({ reconcile });
+      setSubscription(subscriptionRes);
+      return subscriptionRes;
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
-    loadData();
+    void loadData();
+    return () => {
+      pollCancelRef.current?.();
+    };
   }, []);
 
-  const isActive = useMemo(() => {
-    if (!subscription) {
-      return false;
-    }
-    if (subscription.status !== 'active') {
-      return false;
-    }
-    return new Date(subscription.renewalDate).getTime() > Date.now();
-  }, [subscription]);
+  const isActive = useMemo(() => isSubscriptionActive(subscription), [subscription]);
 
   const amount = subscription?.amount ?? 1;
   const planAmount = subscription?.planAmount ?? amount;
@@ -302,6 +332,66 @@ export default function SubscriptionScreen({ navigation }: any) {
     [payments]
   );
   const mpesaEnabled = releaseConfig?.featureFlags.mpesaEnabled ?? true;
+
+  const paymentConfirmed = (latest: Subscription | null, baseline: NonNullable<typeof paymentBaselineRef.current>) => {
+    if (!isSubscriptionActive(latest)) {
+      return false;
+    }
+
+    if (latest?.lastPaymentId && latest.lastPaymentId !== baseline.lastPaymentId) {
+      return true;
+    }
+    if (latest?.renewalDate && latest.renewalDate !== baseline.renewalDate) {
+      return true;
+    }
+    return !baseline.wasActive;
+  };
+
+  const pollForActivation = () => {
+    pollCancelRef.current?.();
+    let cancelled = false;
+    const pollIntervalsMs = [4000, 7000, 10000, 15000, 20000, 25000];
+
+    pollCancelRef.current = () => {
+      cancelled = true;
+    };
+
+    void (async () => {
+      for (const intervalMs of pollIntervalsMs) {
+        await delay(intervalMs);
+        if (cancelled) {
+          return;
+        }
+
+        const latestSubscription = await loadSubscriptionStatus(true);
+        if (cancelled || !latestSubscription) {
+          return;
+        }
+
+        const baseline = paymentBaselineRef.current;
+        if (awaitingPaymentRef.current && baseline && paymentConfirmed(latestSubscription, baseline)) {
+          awaitingPaymentRef.current = false;
+          paymentBaselineRef.current = null;
+          setInfoModal((current) => ({ ...current, visible: false }));
+          await loadData(false);
+          setSuccessModal({
+            visible: true,
+            title: 'Payment Successful',
+            message: 'Your subscription is active and your listing is now visible to customers.',
+          });
+          return;
+        }
+      }
+
+      awaitingPaymentRef.current = false;
+      paymentBaselineRef.current = null;
+      setInfoModal({
+        visible: true,
+        title: 'Payment Still Pending',
+        message: 'We have not received M-Pesa confirmation yet. If you already approved the prompt, give it a little more time and refresh this page shortly.',
+      });
+    })();
+  };
 
   const handlePayment = async () => {
     if (!phone.trim()) {
@@ -328,20 +418,23 @@ export default function SubscriptionScreen({ navigation }: any) {
       if (normalizedPhone !== phone.trim()) {
         setPhone(normalizedPhone);
       }
+      paymentBaselineRef.current = {
+        renewalDate: subscription?.renewalDate ?? null,
+        lastPaymentId: subscription?.lastPaymentId,
+        wasActive: isSubscriptionActive(subscription),
+      };
       const response = await subscriptionsApi.initiatePayment(normalizedPhone);
+      awaitingPaymentRef.current = true;
       setInfoModal({
         visible: true,
         title: 'STK Push Sent',
         message: response.message ?? 'STK push sent. Please complete payment on your phone.',
       });
       await loadData(false);
-      void (async () => {
-        for (let attempt = 0; attempt < 6; attempt += 1) {
-          await delay(5000);
-          await loadData(false);
-        }
-      })();
+      pollForActivation();
     } catch (error: any) {
+      awaitingPaymentRef.current = false;
+      paymentBaselineRef.current = null;
       setErrorModal({
         visible: true,
         title: 'Payment Failed',
@@ -367,6 +460,13 @@ export default function SubscriptionScreen({ navigation }: any) {
         onDismiss={() => setInfoModal((current) => ({ ...current, visible: false }))}
         buttonLabel="Okay"
       />
+      <SuccessModal
+        visible={successModal.visible}
+        title={successModal.title}
+        message={successModal.message}
+        onDismiss={() => setSuccessModal((current) => ({ ...current, visible: false }))}
+        buttonLabel="Great"
+      />
 
       <View style={styles.header}>
         {canGoBack ? (
@@ -383,7 +483,7 @@ export default function SubscriptionScreen({ navigation }: any) {
           <Text style={styles.loadingText}>Loading subscription...</Text>
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.scroll} bottomPadding={40}>
           <View style={[styles.statusCard, isActive ? styles.statusCardActive : styles.statusCardExpired]}>
             <View style={styles.statusTop}>
               <View
@@ -513,8 +613,10 @@ export default function SubscriptionScreen({ navigation }: any) {
               ))
             )}
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       )}
     </View>
   );
 }
+
+

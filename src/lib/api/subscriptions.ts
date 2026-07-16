@@ -7,10 +7,10 @@ export interface InitiateSubscriptionPaymentResponse {
 }
 
 export const subscriptionsApi = {
-  getMySubscription: () => apiClient.get<Subscription | null>('subscriptions/me'),
+  getMySubscription: (options?: { reconcile?: boolean }) =>
+    apiClient.get<Subscription | null>(options?.reconcile ? 'subscriptions/me?reconcile=true' : 'subscriptions/me'),
   initiatePayment: (phoneNumber: string) =>
     apiClient.post<InitiateSubscriptionPaymentResponse>('subscriptions/me/pay', {
       phoneNumber,
     }),
 };
-
