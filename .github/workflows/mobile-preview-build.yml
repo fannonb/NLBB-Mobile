@@ -1,4 +1,5 @@
 name: Mobile Preview APK
+# Touching this workflow file is enough to queue a fresh preview APK build on push.
 
 on:
   workflow_dispatch:
