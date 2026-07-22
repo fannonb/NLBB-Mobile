@@ -129,13 +129,12 @@ export default function MyBookingsScreen({ navigation, route }: any) {
   );
 
   const handleCancel = async (id: string) => {
+    setCancelConfirm(null);
     try {
       await updateBookingStatus(id, 'cancelled');
       setToast({ visible: true, message: 'Booking cancelled.', type: 'info' });
     } catch (error: any) {
       showError('Could Not Cancel Booking', error?.message ?? 'Please try again.');
-    } finally {
-      setCancelConfirm(null);
     }
   };
 

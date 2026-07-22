@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   bookingApi,
   BookingRecord,
+  mapBookingStatusToBackend,
   UpdateBookingStatusPayload,
 } from '../lib/api/bookings';
 import { getStoredSession, getStoredUser } from '../lib/authSession';
@@ -144,17 +145,46 @@ export const useBookingDataStore = create<BookingDataState>((set, get) => ({
   updateBookingStatus: async (bookingId, status) => {
     mutationVersion += 1;
     const operationVersion = mutationVersion;
-    const updated = await bookingApi.updateBookingStatus(bookingId, status);
-    if (operationVersion !== mutationVersion) {
-      return updated;
+    const previous = get().records;
+    const existing = previous.find((booking) => booking.id === bookingId);
+    const optimisticStatus = mapBookingStatusToBackend(status);
+
+    if (existing) {
+      const optimistic: BookingRecord = {
+        ...existing,
+        status: optimisticStatus,
+        updatedAt: new Date().toISOString(),
+      };
+      set({
+        records: mergeBooking(previous, optimistic),
+        loadedAt: Date.now(),
+        error: null,
+      });
+      void persistBookingSnapshot(get().records);
     }
-    set((state) => ({
-      records: mergeBooking(state.records, updated),
-      loadedAt: Date.now(),
-      error: null,
-    }));
-    void persistBookingSnapshot(get().records);
-    return updated;
+
+    try {
+      const updated = await bookingApi.updateBookingStatus(bookingId, status);
+      if (operationVersion !== mutationVersion) {
+        return updated;
+      }
+      set((state) => ({
+        records: mergeBooking(state.records, updated),
+        loadedAt: Date.now(),
+        error: null,
+      }));
+      void persistBookingSnapshot(get().records);
+      return updated;
+    } catch (error) {
+      if (operationVersion === mutationVersion) {
+        set({
+          records: previous,
+          error: errorMessageFor(error),
+        });
+        void persistBookingSnapshot(previous);
+      }
+      throw error;
+    }
   },
 
   addBookingRecord: (booking) => {

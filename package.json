@@ -4,6 +4,8 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start --max-workers 1",
+    "backend:dev": "npm --prefix backend run dev",
+    "backend:dev:local": "npm --prefix backend run dev:local",
     "start:safe": "expo start --clear --max-workers 1 --port 19000",
     "android": "expo run:android",
     "android:safe": "expo start --clear --max-workers 1 --port 19000 --android",

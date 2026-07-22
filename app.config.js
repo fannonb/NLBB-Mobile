@@ -38,11 +38,13 @@ module.exports = {
     android: {
       package: 'com.nlbb.mobile',
       versionCode: 1,
+      usesCleartextTraffic: true,
       ...(hasGoogleServicesFile ? { googleServicesFile: './google-services.json' } : {}),
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff',
       },
+      softwareKeyboardLayoutMode: 'resize',
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       config: {

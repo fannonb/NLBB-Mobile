@@ -54,7 +54,9 @@ const DEFAULT_WORKING_HOURS: WorkingHours[] = [
 
 const DEFAULT_PROVIDER_COVER =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
+/** Favorites / bookings can stay warm longer; notifications need fresher pulls. */
 const HYDRATION_COOLDOWN_MS = 30_000;
+const NOTIFICATION_HYDRATION_COOLDOWN_MS = 8_000;
 const FAVORITES_SNAPSHOT_KEY = 'nlbb_favorites_snapshot_v1';
 const CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY = 'nlbb_customer_notifications_snapshot_v1';
 const PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY = 'nlbb_provider_notifications_snapshot_v1';
@@ -96,8 +98,8 @@ const persistAccountSnapshot = async <T>(key: string, data: T) => {
   await safeStorage.setItem(key, JSON.stringify(snapshot));
 };
 
-const hasFreshData = (lastHydratedAt: number) =>
-  lastHydratedAt > 0 && Date.now() - lastHydratedAt < HYDRATION_COOLDOWN_MS;
+const hasFreshData = (lastHydratedAt: number, cooldownMs = HYDRATION_COOLDOWN_MS) =>
+  lastHydratedAt > 0 && Date.now() - lastHydratedAt < cooldownMs;
 
 const resetHydrationState = () => {
   favoritesHydrationPromise = null;
@@ -122,13 +124,13 @@ const noteFavoritesMutation = () => {
 };
 
 const noteCustomerNotificationsMutation = () => {
+  // Bump generation for optimistic concurrency, but do NOT refresh the hydrate
+  // timestamp — mark-read must not block discovering newly created notifications.
   customerNotificationsMutationVersion += 1;
-  lastCustomerNotificationsHydratedAt = Date.now();
 };
 
 const noteProviderNotificationsMutation = () => {
   providerNotificationsMutationVersion += 1;
-  lastProviderNotificationsHydratedAt = Date.now();
 };
 
 const EMPTY_PROVIDER_PROFILE: ProviderProfile = {
@@ -153,7 +155,7 @@ const toProviderNotification = (notification: Notification): ProviderNotificatio
   title: notification.title,
   body: notification.body,
   type: notification.type,
-  isRead: notification.isRead,
+  isRead: notification.isRead === true,
   createdAt: notification.createdAt,
   actionType: notification.actionType,
   actionId: notification.actionId,
@@ -346,7 +348,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
         }
 
-        if (!options?.force && hasFreshData(lastCustomerNotificationsHydratedAt)) {
+        if (!options?.force && hasFreshData(lastCustomerNotificationsHydratedAt, NOTIFICATION_HYDRATION_COOLDOWN_MS)) {
           return;
         }
 
@@ -452,7 +454,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
         }
 
-        if (!options?.force && hasFreshData(lastProviderNotificationsHydratedAt)) {
+        if (!options?.force && hasFreshData(lastProviderNotificationsHydratedAt, NOTIFICATION_HYDRATION_COOLDOWN_MS)) {
           return;
         }
 

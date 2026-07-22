@@ -168,32 +168,70 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
     });
   };
 
+  const resolveContactPhone = async (preferWhatsapp = false) => {
+    // Guests get contacts stripped by the API — always re-fetch after auth.
+    let phone = preferWhatsapp
+      ? hydratedProvider.whatsapp ?? hydratedProvider.phone
+      : hydratedProvider.phone ?? hydratedProvider.whatsapp;
+
+    if (!phone) {
+      try {
+        const fresh = await providerApi.getProvider(providerId);
+        if (fresh) {
+          setProvider(fresh);
+          phone = preferWhatsapp
+            ? fresh.whatsapp ?? fresh.phone
+            : fresh.phone ?? fresh.whatsapp;
+        }
+      } catch {
+        // Keep existing empty value; caller shows the appropriate message.
+      }
+    }
+
+    return (phone ?? '').trim();
+  };
+
   const handleCall = () => {
-    if (!hydratedProvider.phone) {
+    // Only show "no number" when we know contacts aren't locked and none exist.
+    if (!hydratedProvider.contactsLocked && hydratedProvider.hasPhone === false) {
       showInfo('No Phone Number', 'This provider has not added a contact number yet.');
       return;
     }
+
+    // Auth first — guest responses hide phone numbers on purpose.
     handleContact(() => {
-      void openPhoneNumber(hydratedProvider.phone).then((opened) => {
+      void (async () => {
+        const phone = await resolveContactPhone(false);
+        if (!phone) {
+          showInfo('No Phone Number', 'This provider has not added a contact number yet.');
+          return;
+        }
+        const opened = await openPhoneNumber(phone);
         if (!opened) {
           showError('Unable to Open', 'Phone calling is not supported on your device.');
         }
-      });
+      })();
     });
   };
 
   const handleWhatsApp = () => {
-    const phone = hydratedProvider.whatsapp ?? hydratedProvider.phone;
-    if (!phone) {
+    if (!hydratedProvider.contactsLocked && hydratedProvider.hasWhatsapp === false) {
       showInfo('No WhatsApp Number', 'This provider has not added a WhatsApp contact yet.');
       return;
     }
+
     handleContact(() => {
-      void openWhatsAppContact(phone).then((opened) => {
+      void (async () => {
+        const phone = await resolveContactPhone(true);
+        if (!phone) {
+          showInfo('No WhatsApp Number', 'This provider has not added a WhatsApp contact yet.');
+          return;
+        }
+        const opened = await openWhatsAppContact(phone);
         if (!opened) {
           showError('Unable to Open', 'WhatsApp is not available on your device.');
         }
-      });
+      })();
     });
   };
 

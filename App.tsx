@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, StyleSheet, View, type AppStateStatus } from 'react-native';
 import * as Font from 'expo-font';
 import { applyThemeMode, getThemeColors, ThemeMode } from './src/constants/theme';
 import { loadThemePreference } from './src/lib/themePreference';
@@ -14,6 +14,7 @@ import { useAppStore } from './src/store/appStore';
 import { useAuthStore } from './src/store/authStore';
 import { useBookingDataStore } from './src/store/bookingDataStore';
 import RootNavigator from './src/navigation/RootNavigator';
+import { navigateFromNotificationPayload } from './src/lib/notificationNavigation';
 import { PushNotificationPayload, subscribeToPushNotifications } from './src/lib/push';
 
 const THEME_BOOTSTRAP_TIMEOUT_MS = 1500;
@@ -77,51 +78,45 @@ const hydrateNotificationsForSignedInUser = async () => {
   }
 };
 
+const pollNotificationsForSignedInUser = async () => {
+  const role = useAuthStore.getState().user?.role;
+  const appState = useAppStore.getState();
+
+  if (role === 'provider') {
+    await appState.hydrateProviderNotifications({ force: true });
+    return;
+  }
+
+  if (role === 'customer') {
+    await appState.hydrateCustomerNotifications({ force: true });
+  }
+};
+
 const navigateFromPushPayload = (payload: PushNotificationPayload | null) => {
   const role = useAuthStore.getState().user?.role;
   if (!role || !navigationRef.isReady()) {
     return false;
   }
 
-  switch (payload?.actionType) {
-    case 'customer_bookings':
-      navigationRef.navigate('CustomerApp', {
-        screen: 'Bookings',
-        params: payload.actionId ? { bookingId: payload.actionId } : undefined,
-      });
-      return true;
-    case 'provider_appointment_detail':
-      if (payload.actionId) {
-        navigationRef.navigate('AppointmentDetail', { appointmentId: payload.actionId });
-      } else {
-        navigationRef.navigate('ProviderNotifications');
-      }
-      return true;
-    case 'provider_subscription':
-      navigationRef.navigate('ProviderApp', {
-        screen: 'Business',
-        params: { screen: 'Subscription' },
-      });
-      return true;
-    case 'provider_reviews':
-      navigationRef.navigate('ProviderReviews');
-      return true;
-    default:
-      if (role === 'provider') {
-        navigationRef.navigate('ProviderNotifications');
-        return true;
-      }
-      if (role === 'customer') {
-        navigationRef.navigate('Notifications');
-        return true;
-      }
-      return false;
+  if (navigateFromNotificationPayload(payload, { role })) {
+    return true;
   }
+
+  if (role === 'provider') {
+    navigationRef.navigate('ProviderNotifications');
+    return true;
+  }
+  if (role === 'customer') {
+    navigationRef.navigate('Notifications');
+    return true;
+  }
+  return false;
 };
 
 export default function App() {
   const [isBootstrapped, setIsBootstrapped] = useState(false);
   const themeMode = useAppStore((state) => state.theme);
+  const userRole = useAuthStore((state) => state.user?.role);
   const [navigationReady, setNavigationReady] = useState(false);
   const [pendingRecoveryToken, setPendingRecoveryToken] = useState<string | null>(null);
   const [pendingPushPayload, setPendingPushPayload] = useState<PushNotificationPayload | null | undefined>(undefined);
@@ -131,21 +126,20 @@ export default function App() {
 
     const bootstrapTheme = async () => {
       try {
-        const savedTheme = await loadThemeWithTimeout();
-        applyThemeMode(savedTheme);
-        useAppStore.setState({ theme: savedTheme });
-
-        // Load custom fonts
-        try {
-          await Font.loadAsync({
+        // Theme + fonts in parallel so splash doesn't wait twice.
+        const [savedTheme] = await Promise.all([
+          loadThemeWithTimeout(),
+          Font.loadAsync({
             'PlayfairDisplay-Regular': require('./assets/fonts/PlayfairDisplay-Regular.ttf'),
             'PlayfairDisplay-Medium': require('./assets/fonts/PlayfairDisplay-Medium.ttf'),
             'PlayfairDisplay-SemiBold': require('./assets/fonts/PlayfairDisplay-SemiBold.ttf'),
             'PlayfairDisplay-Bold': require('./assets/fonts/PlayfairDisplay-Bold.ttf'),
-          });
-        } catch (fontError) {
-          console.warn('[App] Failed to load local fonts:', fontError);
-        }
+          }).catch((fontError) => {
+            console.warn('[App] Failed to load local fonts:', fontError);
+          }),
+        ]);
+        applyThemeMode(savedTheme);
+        useAppStore.setState({ theme: savedTheme });
 
         if (!isMounted) {
           return;
@@ -210,6 +204,29 @@ export default function App() {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    let lastState: AppStateStatus = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (lastState.match(/inactive|background/) && nextState === 'active') {
+        void hydrateNotificationsForSignedInUser();
+      }
+      lastState = nextState;
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (userRole !== 'provider' && userRole !== 'customer') {
+      return;
+    }
+
+    const poll = setInterval(() => {
+      void pollNotificationsForSignedInUser();
+    }, 20_000);
+
+    return () => clearInterval(poll);
+  }, [userRole]);
 
   useEffect(() => {
     if (!navigationReady || !navigationRef.isReady() || pendingPushPayload === undefined) {

@@ -53,38 +53,37 @@ const fallbackApiBaseUrl = () => {
 
 const buildApiBaseUrls = () => {
   const urls: string[] = [];
-  const envBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? null;
+  const envBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ?? null;
   const appEnv = (process.env.EXPO_PUBLIC_APP_ENV ?? 'development').trim().toLowerCase();
   const expoHost = resolveExpoHost();
-  const isAndroidEmulator = Platform.OS === 'android' && !Constants.isDevice;
-  const isEmulatorLoopbackEnv = (envBaseUrl ?? '').includes('10.0.2.2');
+  const isPhysicalDevice = Constants.isDevice === true;
+  const isAndroidEmulator = Platform.OS === 'android' && !isPhysicalDevice;
   const preferHostedApi =
     appEnv === 'production' || (envBaseUrl ?? '').trim().toLowerCase().startsWith('https://');
 
   if (preferHostedApi) {
     appendUnique(urls, envBaseUrl);
+    return urls;
   }
 
-  if (!preferHostedApi && expoHost) {
+  // When dev API URL is explicitly configured, use it as the single source of truth.
+  if (envBaseUrl) {
+    appendUnique(urls, envBaseUrl);
+    return urls;
+  }
+
+  if (expoHost) {
     appendUnique(urls, `http://${expoHost}:4000/api`);
   }
 
-  if (!preferHostedApi && isAndroidEmulator) {
+  if (isAndroidEmulator) {
     appendUnique(urls, 'http://10.0.2.2:4000/api');
   }
 
-  if ((!isEmulatorLoopbackEnv || isAndroidEmulator) && !preferHostedApi) {
-    appendUnique(urls, envBaseUrl);
-  }
-
-  if (!preferHostedApi) {
+  if (!isPhysicalDevice) {
     appendUnique(urls, fallbackApiBaseUrl());
     appendUnique(urls, 'http://localhost:4000/api');
     appendUnique(urls, 'http://127.0.0.1:4000/api');
-  }
-
-  if (isEmulatorLoopbackEnv && !isAndroidEmulator) {
-    appendUnique(urls, envBaseUrl);
   }
 
   return urls;

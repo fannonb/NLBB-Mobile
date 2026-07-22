@@ -44,6 +44,12 @@ export interface Provider {
   address: string;
   phone?: string;
   whatsapp?: string;
+  /** True when a phone exists even if the number is locked for guests */
+  hasPhone?: boolean;
+  /** True when a WhatsApp number exists even if locked for guests */
+  hasWhatsapp?: boolean;
+  /** True when contact numbers are hidden until the customer signs in */
+  contactsLocked?: boolean;
   instagram?: string;
   facebook?: string;
   mpesaPhone?: string;

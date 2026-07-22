@@ -112,9 +112,15 @@ const request = async <T>(
       path,
       attemptedBaseUrls,
       networkErrors,
+      hint:
+        networkErrors.some((entry) => entry.includes('timed out'))
+          ? 'Backend responded too slowly or is offline. Ensure `npm run backend:dev` is running and phone/PC share Wi‑Fi.'
+          : 'Backend is offline or wrong API URL. Ensure `npm run backend:dev` is running.',
     });
     throw createApiClientError(
-      `Cannot reach backend. Tried: ${API_BASE_URLS.join(', ')}`,
+      networkErrors.some((entry) => entry.includes('timed out'))
+        ? `Backend timed out. Start it with: npm run backend:dev`
+        : `Cannot reach backend. Start it with: npm run backend:dev`,
       0,
       'BACKEND_UNREACHABLE',
       {
