@@ -322,7 +322,7 @@ export default function SubscriptionScreen({ navigation }: any) {
 
   const isActive = useMemo(() => isSubscriptionActive(subscription), [subscription]);
 
-  const amount = subscription?.amount ?? 1;
+  const amount = subscription?.amount ?? 300;
   const planAmount = subscription?.planAmount ?? amount;
   const creditBalance = subscription?.creditBalance ?? 0;
   const renewalDate = subscription?.renewalDate ?? null;
@@ -618,5 +618,4 @@ export default function SubscriptionScreen({ navigation }: any) {
     </View>
   );
 }
-
 

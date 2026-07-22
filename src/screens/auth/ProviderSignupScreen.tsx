@@ -209,7 +209,7 @@ export default function ProviderSignupScreen({ navigation }: any) {
             <View style={styles.subNotice}>
               <Feather name="info" size={14} color={Colors.gold} />
               <Text style={styles.subNoticeText}>
-                A monthly subscription of <Text style={{ color: Colors.gold }}>Ksh 1 via M-Pesa</Text> is required to remain visible to customers.
+                A monthly subscription of <Text style={{ color: Colors.gold }}>Ksh 300 via M-Pesa</Text> is required to remain visible to customers.
               </Text>
             </View>
           </View>
