@@ -4,14 +4,12 @@ import {
   Text,
   StyleSheet,
   Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brand, ColorPalette, Fonts } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
+import KeyboardAwareScrollView from '../KeyboardAwareScrollView';
 
 interface AuthScreenLayoutProps {
   title: string;
@@ -47,7 +45,6 @@ function createLayoutStyles(p: ColorPalette) {
       bottom: 120,
       left: -60,
     },
-    keyboardView: { flex: 1 },
     scroll: { flexGrow: 1, paddingHorizontal: 20 },
     header: {
       alignItems: 'center',
@@ -107,36 +104,28 @@ export default function AuthScreenLayout({
       <View style={styles.circle1} />
       <View style={styles.circle2} />
 
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <KeyboardAwareScrollView
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 24 }]}
+        bottomPadding={24}
+        includeSafeArea
       >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scroll,
-            { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.header}>
-            {showLogo ? (
-              <Image
-                source={require('../../../assets/transparent_logo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            ) : null}
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
-            <Text style={styles.tagline}>{Brand.tagline}</Text>
-          </View>
+        <View style={styles.header}>
+          {showLogo ? (
+            <Image
+              source={require('../../../assets/transparent_logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          ) : null}
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+          <Text style={styles.tagline}>{Brand.tagline}</Text>
+        </View>
 
-          {children}
+        {children}
 
-          {footer ? <View style={styles.footer}>{footer}</View> : null}
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {footer ? <View style={styles.footer}>{footer}</View> : null}
+      </KeyboardAwareScrollView>
     </View>
   );
 }

@@ -5,8 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Image,
 } from 'react-native';
@@ -15,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
+import KeyboardAwareScrollView from '../../components/KeyboardAwareScrollView';
 import { useModalManager } from '../../hooks/useModalManager';
 import { reviewsApi } from '../../lib/api/reviews';
 
@@ -165,10 +164,7 @@ export default function WriteReviewScreen({ navigation, route }: any) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
           <Feather name="x" size={20} color={palette.textSecondary} />
@@ -177,7 +173,7 @@ export default function WriteReviewScreen({ navigation, route }: any) {
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.scroll}>
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll} bottomPadding={32}>
         <View style={styles.providerCard}>
           {providerImage ? (
             <Image source={{ uri: providerImage }} style={styles.providerImg} />
@@ -250,8 +246,8 @@ export default function WriteReviewScreen({ navigation, route }: any) {
         <Text style={styles.privacyNote}>
           Reviews are public and tied to your account. Be honest and respectful.
         </Text>
-      </View>
+      </KeyboardAwareScrollView>
       <FeedbackModalHost modal={modal} onDismiss={hideModal} />
-    </KeyboardAvoidingView>
+    </View>
   );
 }

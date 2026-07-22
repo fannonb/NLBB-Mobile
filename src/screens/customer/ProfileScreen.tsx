@@ -18,7 +18,6 @@ import { toCustomerBookingCard } from '../../lib/api/bookings';
 import { providerApi } from '../../lib/api/providers';
 import { Provider } from '../../types';
 import { authApi } from '../../lib/api/auth';
-import { notificationsApi } from '../../lib/api/notifications';
 import { isApiClientError } from '../../lib/api/client';
 import { useBookingDataStore } from '../../store/bookingDataStore';
 
@@ -73,17 +72,6 @@ function createProfileStyles(p: ColorPalette, s: ShadowPalette) {
       borderColor: p.gold,
     },
     editBtnText: { color: p.gold, fontFamily: Fonts.sansMedium, fontSize: 14 },
-    pushTestBtn: {
-      marginTop: 12,
-      backgroundColor: p.textPrimary,
-      borderRadius: Radius.md,
-      paddingHorizontal: 18,
-      paddingVertical: 14,
-      alignItems: 'center',
-      ...s.soft,
-    },
-    pushTestBtnText: { color: p.bg, fontFamily: Fonts.sansMedium, fontSize: 14 },
-    pushTestBtnSub: { color: p.textMuted, fontFamily: Fonts.sans, fontSize: 11, marginTop: 2 },
     section: { marginBottom: 32 },
     sectionHeader: {
       flexDirection: 'row',
@@ -246,7 +234,6 @@ export default function ProfileScreen({ navigation }: any) {
   const openAuthGate = useAuthGateStore((state) => state.open);
   const { customerNotifications, favorites, hydrateCustomerNotifications } = useAppStore();
   const { modal, showActionSheet, showInfo, showError, showSuccess, hideModal } = useModalManager();
-  const [sendingTestPush, setSendingTestPush] = useState(false);
   const unreadCount = isLoggedIn ? customerNotifications.filter((notification) => !notification.isRead).length : 0;
   const bookingRecords = useBookingDataStore((state) => state.records);
   const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
@@ -353,22 +340,6 @@ export default function ProfileScreen({ navigation }: any) {
       },
     ];
     showActionSheet('Update Photo', options);
-  };
-
-  const sendTestPush = async () => {
-    setSendingTestPush(true);
-    try {
-      await notificationsApi.sendTestPush({
-        title: 'NLBB push test',
-        body: 'If this appears, push notifications are working correctly on your device.',
-      });
-      showSuccess('Test Push Sent', 'We sent a test notification to this device. Watch for it now.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to send the test push right now.';
-      showError('Push Test Failed', message);
-    } finally {
-      setSendingTestPush(false);
-    }
   };
 
   useEffect(() => {
@@ -478,10 +449,6 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={styles.userMeta}>{userMeta || 'Account details will appear here'}</Text>
           <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditProfile')}>
             <Text style={styles.editBtnText}>Edit Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pushTestBtn} onPress={sendTestPush} disabled={sendingTestPush}>
-            <Text style={styles.pushTestBtnText}>{sendingTestPush ? 'Sending...' : 'Send Test Push'}</Text>
-            <Text style={styles.pushTestBtnSub}>Quickly verify push notifications on this device</Text>
           </TouchableOpacity>
         </View>
 

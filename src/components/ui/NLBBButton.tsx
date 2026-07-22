@@ -49,6 +49,7 @@ function createButtonStyles(p: ColorPalette, s: ShadowPalette) {
       fontFamily: Fonts.sansBold,
       fontWeight: '700',
       letterSpacing: 0.2,
+      textAlign: 'center',
     },
     labelPrimary: {
       color: p.bg,
@@ -182,7 +183,14 @@ export default function NLBBButton({
         {loading ? (
           <ActivityIndicator color={spinnerColor} size="small" />
         ) : (
-          <Text style={[styles.label, labelStyle, { fontSize }, textStyle]}>{label}</Text>
+          <Text
+            style={[styles.label, labelStyle, { fontSize }, textStyle]}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+          >
+            {label}
+          </Text>
         )}
       </Animated.View>
     </Pressable>

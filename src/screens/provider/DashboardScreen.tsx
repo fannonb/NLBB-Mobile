@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
+import ProviderNotifButton from '../../components/ProviderNotifButton';
 import SectionHeader from '../../components/SectionHeader';
 import Toast from '../../components/Toast';
 import { useAppStore } from '../../store/appStore';
@@ -79,14 +80,6 @@ function createDashboardStyles(p: ColorPalette, s: ShadowPalette) {
     location: { color: p.textSecondary, fontSize: 13 },
     businessName: { color: p.textPrimary, fontFamily: Fonts.serifMedium, fontSize: 22 },
     headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    notifBtn: { position: 'relative', width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-    notifBadge: {
-      position: 'absolute', top: 4, right: 4, width: 16, height: 16,
-      borderRadius: 8, backgroundColor: p.error,
-      alignItems: 'center', justifyContent: 'center',
-      borderWidth: 1.5, borderColor: p.bg,
-    },
-    notifBadgeText: { color: '#fff', fontSize: 9, fontFamily: Fonts.sansBold },
     avatar: {
       width: 44,
       height: 44,
@@ -396,13 +389,10 @@ export default function DashboardScreen({ navigation }: any) {
   const palette = useThemedColors();
   const shadow = useThemedShadows();
   const styles = useMemo(() => createDashboardStyles(palette, shadow), [palette, shadow]);
-  const { user } = useAuthStore();
-  const {
-    providerNotifications,
-    providerProfile,
-    hydrateProviderNotifications,
-    updateProviderProfile,
-  } = useAppStore();
+  const user = useAuthStore((s) => s.user);
+  const providerProfile = useAppStore((s) => s.providerProfile);
+  const hydrateProviderNotifications = useAppStore((s) => s.hydrateProviderNotifications);
+  const updateProviderProfile = useAppStore((s) => s.updateProviderProfile);
   const bookingRecords = useBookingDataStore((state) => state.records);
   const bookingsLoading = useBookingDataStore((state) => state.loading);
   const bookingsLoadedAt = useBookingDataStore((state) => state.loadedAt);
@@ -424,7 +414,7 @@ export default function DashboardScreen({ navigation }: any) {
     if (!hasLoadedProfile.current) {
       setLoadingProfile(true);
     }
-    void hydrateProviderNotifications();
+    void hydrateProviderNotifications({ force: true });
     try {
       const [, provider] = await Promise.all([
         loadMyBookings(),
@@ -482,7 +472,6 @@ export default function DashboardScreen({ navigation }: any) {
   const todayUpcoming = upcomingAppointments.filter((a) => isSameCalendarDay(a.scheduledAt));
   const completedCount = bookingRecords.filter((booking) => booking.status === 'completed').length;
   const nextUp = upcomingAppointments[0] ?? null;
-  const unreadCount = providerNotifications.filter((n) => !n.isRead).length;
   const resolvedAvatarUri = pickPreferredString(providerProfile.avatar, user?.avatar);
   const avatarImageUri = buildFreshImageUri(
     resolvedAvatarUri,
@@ -510,6 +499,7 @@ export default function DashboardScreen({ navigation }: any) {
   const handleMarkCompleted = async (appointmentId: string) => {
     try {
       await updateBookingStatus(appointmentId, 'completed');
+      void useAppStore.getState().hydrateProviderNotifications({ force: true });
       setToast({
         visible: true,
         message: 'Appointment marked as completed.',
@@ -539,17 +529,7 @@ export default function DashboardScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.notifBtn}
-            onPress={() => navigation.navigate('ProviderNotifications')}
-          >
-            <Feather name="bell" size={20} color={palette.textSecondary} />
-            {unreadCount > 0 && (
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>{unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <ProviderNotifButton />
           <TouchableOpacity onPress={() => navigation.navigate('ProviderProfile')} activeOpacity={0.85}>
             <View style={styles.avatar}>
               {avatarImageUri ? (

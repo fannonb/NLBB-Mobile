@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "886001302549",
+    "project_id": "nlbb-5152a",
+    "storage_bucket": "nlbb-5152a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:886001302549:android:5987d08d1acf756e89a21c",
+        "android_client_info": {
+          "package_name": "com.nlbb.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDBfYJMkxvObReeLMFP8BrvArT95U1jPfQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

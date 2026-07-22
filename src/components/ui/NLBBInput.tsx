@@ -9,6 +9,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import InputFocusWrap from '../InputFocusWrap';
 import { ColorPalette, Fonts, Radius } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
 
@@ -47,6 +48,8 @@ function createInputStyles(p: ColorPalette) {
     },
     input: {
       flex: 1,
+      minWidth: 0,
+      alignSelf: 'stretch',
       color: p.textPrimary,
       fontFamily: Fonts.sans,
       fontSize: 14,
@@ -82,7 +85,7 @@ export default function NLBBInput({
   return (
     <View style={[styles.field, containerStyle]}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <View style={[styles.inputWrap, error ? styles.inputWrapError : null]}>
+      <InputFocusWrap style={[styles.inputWrap, error ? styles.inputWrapError : null]}>
         {icon ? <Feather name={icon} size={16} color={palette.textSecondary} /> : null}
         <TextInput
           {...inputProps}
@@ -100,7 +103,7 @@ export default function NLBBInput({
           </TouchableOpacity>
         ) : null}
         {rightElement}
-      </View>
+      </InputFocusWrap>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );

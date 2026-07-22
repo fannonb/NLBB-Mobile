@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   Switch,
   ActivityIndicator,
 } from 'react-native';
@@ -18,9 +16,10 @@ import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import GoldButton from '../../components/GoldButton';
 import ConfirmModal from '../../components/ConfirmModal';
 import ErrorModal from '../../components/ErrorModal';
+import InputFocusWrap from '../../components/InputFocusWrap';
 import Toast from '../../components/Toast';
 import EmptyState from '../../components/EmptyState';
-import { useModalManager } from '../../hooks/useModalManager';
+import KeyboardAwareSheet, { useScrollFieldIntoView } from '../../components/KeyboardAwareSheet';
 import { providerManagementApi, ProviderService } from '../../lib/api/providerManagement';
 import { providerApi } from '../../lib/api/providers';
 import { useProviderAddStore } from '../../store/providerAddStore';
@@ -110,22 +109,39 @@ function createServicesStyles(p: ColorPalette, s: ShadowPalette) {
     },
     addServiceText: { color: p.gold, fontFamily: Fonts.sansMedium, fontSize: 14 },
     modalOverlay: {
-      ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.7)',
-      justifyContent: 'flex-end', zIndex: 100,
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      justifyContent: 'flex-end',
     },
     modal: {
-      backgroundColor: p.card, borderTopLeftRadius: Radius.xl,
-      borderTopRightRadius: Radius.xl, padding: 24, maxHeight: '90%',
+      backgroundColor: p.card,
+      borderTopLeftRadius: Radius.xl,
+      borderTopRightRadius: Radius.xl,
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      maxHeight: '92%',
     },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontFamily: Fonts.serifMedium, fontSize: 20, color: p.textPrimary },
+    modalScroll: { flexGrow: 0 },
     modalField: { gap: 6, marginBottom: 16 },
     modalLabel: { color: p.textSecondary, fontFamily: Fonts.sansMedium, fontSize: 12 },
     modalInputWrap: {
       backgroundColor: p.cardInner, borderRadius: Radius.md,
       borderWidth: 1, borderColor: p.border, paddingHorizontal: 14, paddingVertical: 12,
     },
-    modalInput: { color: p.textPrimary, fontFamily: Fonts.sans, fontSize: 14, padding: 0 },
+    modalInput: {
+      color: p.textPrimary,
+      fontFamily: Fonts.sans,
+      fontSize: 14,
+      padding: 0,
+      width: '100%',
+      minWidth: 0,
+    },
+    modalTextArea: {
+      color: p.textPrimary, fontFamily: Fonts.sans, fontSize: 14, padding: 0,
+      minHeight: 72, textAlignVertical: 'top', width: '100%',
+    },
     rowFields: { flexDirection: 'row', gap: 12 },
     catPickerRow: { gap: 8, paddingBottom: 4 },
     catPickerChip: {
@@ -164,11 +180,12 @@ export default function ServicesScreen({ navigation }: any) {
   const styles = useMemo(() => createServicesStyles(palette, shadow), [palette, shadow]);
   const consumeAddService = useProviderAddStore((s) => s.consumeAddService);
   const canGoBack = navigation.canGoBack?.() ?? false;
+  const modalScrollRef = useRef<ScrollView>(null);
+  const scrollFormFieldIntoView = useScrollFieldIntoView(modalScrollRef);
 
   const [services, setServices] = useState<ProviderService[]>([]);
   const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -184,7 +201,6 @@ export default function ServicesScreen({ navigation }: any) {
     title: '',
     message: '',
   });
-  const { showError: showErrorFromHook } = useModalManager();
 
   const showError = (title: string, message: string) => {
     setErrorModal({ visible: true, title, message });
@@ -202,7 +218,7 @@ export default function ServicesScreen({ navigation }: any) {
       try {
         const [response, categoryResponse] = await Promise.all([
           providerManagementApi.listMyServices(),
-          providerApi.listCategories({ force: true }).catch(() => []),
+          providerApi.listCategories().catch(() => []),
         ]);
         if (!active) return;
         setServices(response);
@@ -284,10 +300,33 @@ export default function ServicesScreen({ navigation }: any) {
       description: form.description.trim(),
       category: form.category,
     };
+    const editingId = form.id;
+    const wasEditing = isEditing && Boolean(editingId);
+    const previousServices = services;
+
+    if (wasEditing && editingId) {
+      setServices((current) =>
+        current.map((service) =>
+          service.id === editingId
+            ? {
+                ...service,
+                name: payload.name,
+                price: payload.price,
+                duration: payload.duration ?? service.duration,
+                description: payload.description,
+                category: payload.category,
+              }
+            : service
+        )
+      );
+    }
+
+    setShowModal(false);
+    setForm(EMPTY_FORM);
 
     try {
-      if (isEditing && form.id) {
-        const updated = await providerManagementApi.updateMyService(form.id, payload);
+      if (wasEditing && editingId) {
+        const updated = await providerManagementApi.updateMyService(editingId, payload);
         setServices((current) => current.map((service) => (service.id === updated.id ? updated : service)));
         showToast('Service updated successfully.');
       } else {
@@ -295,37 +334,41 @@ export default function ServicesScreen({ navigation }: any) {
         setServices((current) => [created, ...current]);
         showToast('Service added successfully.');
       }
-      setShowModal(false);
-      setForm(EMPTY_FORM);
     } catch (error: any) {
+      setServices(previousServices);
       showError('Could Not Save Service', error?.message ?? 'Please try again.');
     }
   };
 
   const handleDelete = async (id: string) => {
+    const previousServices = services;
+    setDeleteConfirm(null);
+    setServices((current) => current.filter((service) => service.id !== id));
+
     try {
-      setSyncingId(id);
       await providerManagementApi.deleteMyService(id);
-      setServices((current) => current.filter((service) => service.id !== id));
       showToast('Service deleted.', 'info');
     } catch (error: any) {
+      setServices(previousServices);
       showError('Could Not Delete Service', error?.message ?? 'Please try again.');
-    } finally {
-      setDeleteConfirm(null);
-      setSyncingId(null);
     }
   };
 
   const handleToggle = async (service: ProviderService) => {
+    const nextActive = !service.isActive;
+    setServices((current) =>
+      current.map((item) => (item.id === service.id ? { ...item, isActive: nextActive } : item))
+    );
+
     try {
-      setSyncingId(service.id);
-      const updated = await providerManagementApi.setMyServiceActive(service.id, !service.isActive);
+      const updated = await providerManagementApi.setMyServiceActive(service.id, nextActive);
       setServices((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       showToast(updated.isActive ? 'Service activated.' : 'Service paused.', 'info');
     } catch (error: any) {
+      setServices((current) =>
+        current.map((item) => (item.id === service.id ? { ...item, isActive: service.isActive } : item))
+      );
       showError('Could Not Update Service', error?.message ?? 'Please try again.');
-    } finally {
-      setSyncingId(null);
     }
   };
 
@@ -425,7 +468,9 @@ export default function ServicesScreen({ navigation }: any) {
                   </View>
                   <View style={styles.serviceInfo}>
                     <Text style={[styles.serviceName, !service.isActive && styles.inactiveText]}>{service.name}</Text>
-                    <Text style={styles.serviceMeta}>{service.duration} min - {service.description}</Text>
+                    <Text style={styles.serviceMeta}>
+                      {[`${service.duration} min`, service.description?.trim()].filter(Boolean).join(' · ')}
+                    </Text>
                     <Text style={styles.serviceCategory}>{service.category}</Text>
                   </View>
                 </View>
@@ -439,7 +484,6 @@ export default function ServicesScreen({ navigation }: any) {
                       onValueChange={() => handleToggle(service)}
                       trackColor={{ false: palette.border, true: palette.goldBorder }}
                       thumbColor={service.isActive ? palette.gold : palette.textMuted}
-                      disabled={syncingId === service.id}
                       style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
                     />
                     <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(service)}>
@@ -462,111 +506,115 @@ export default function ServicesScreen({ navigation }: any) {
         )}
       </ScrollView>
 
-      {showModal && (
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowModal(false)} />
-          <View style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{isEditing ? 'Edit Service' : 'Add Service'}</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Feather name="x" size={20} color={palette.textSecondary} />
+      <KeyboardAwareSheet
+        ref={modalScrollRef}
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        sheetStyle={styles.modal}
+        overlayStyle={styles.modalOverlay}
+        bottomPadding={16}
+      >
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>{isEditing ? 'Edit Service' : 'Add Service'}</Text>
+          <TouchableOpacity onPress={() => setShowModal(false)}>
+            <Feather name="x" size={20} color={palette.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.modalField}>
+          <Text style={styles.modalLabel}>Service Name *</Text>
+          <InputFocusWrap style={styles.modalInputWrap}>
+            <TextInput
+              placeholder="e.g. Silk Press & Trim"
+              placeholderTextColor={palette.textMuted}
+              style={styles.modalInput}
+              value={form.name}
+              onChangeText={(v) => setForm((current) => ({ ...current, name: v }))}
+              onFocus={scrollFormFieldIntoView}
+              returnKeyType="next"
+            />
+          </InputFocusWrap>
+        </View>
+
+        <View style={styles.modalField}>
+          <Text style={styles.modalLabel}>Category *</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catPickerRow}>
+            {availableCategories.map((category) => {
+              const visual = getCategoryVisual(category.slug ?? category.name, category.icon);
+              return (
+              <TouchableOpacity
+                key={category.id}
+                onPress={() => setForm((current) => ({ ...current, category: category.name }))}
+                style={[styles.catPickerChip, form.category === category.name && styles.catPickerChipActive]}
+              >
+                <MaterialCommunityIcons
+                  name={visual.icon}
+                  size={14}
+                  color={form.category === category.name ? palette.bg : palette.textSecondary}
+                />
+                <Text style={[styles.catPickerText, form.category === category.name && styles.catPickerTextActive]}>
+                  {category.name}
+                </Text>
               </TouchableOpacity>
-            </View>
+              );
+            })}
+          </ScrollView>
+        </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalField}>
-                <Text style={styles.modalLabel}>Service Name *</Text>
-                <View style={styles.modalInputWrap}>
-                  <TextInput
-                    placeholder="e.g. Silk Press & Trim"
-                    placeholderTextColor={palette.textMuted}
-                    style={styles.modalInput}
-                    value={form.name}
-                    onChangeText={(v) => setForm((current) => ({ ...current, name: v }))}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.modalField}>
-                <Text style={styles.modalLabel}>Category *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catPickerRow}>
-                  {availableCategories.map((category) => {
-                    const visual = getCategoryVisual(category.slug ?? category.name, category.icon);
-                    return (
-                    <TouchableOpacity
-                      key={category.id}
-                      onPress={() => setForm((current) => ({ ...current, category: category.name }))}
-                      style={[styles.catPickerChip, form.category === category.name && styles.catPickerChipActive]}
-                    >
-                      <MaterialCommunityIcons
-                        name={visual.icon}
-                        size={14}
-                        color={form.category === category.name ? palette.bg : palette.textSecondary}
-                      />
-                      <Text style={[styles.catPickerText, form.category === category.name && styles.catPickerTextActive]}>
-                        {category.name}
-                      </Text>
-                    </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-
-              <View style={styles.rowFields}>
-                <View style={[styles.modalField, { flex: 1 }]}>
-                  <Text style={styles.modalLabel}>Price (Ksh) *</Text>
-                  <View style={styles.modalInputWrap}>
-                    <TextInput
-                      placeholder="0"
-                      placeholderTextColor={palette.textMuted}
-                      style={styles.modalInput}
-                      value={form.price}
-                      onChangeText={(v) => setForm((current) => ({ ...current, price: v.replace(/[^0-9]/g, '') }))}
-                      keyboardType="number-pad"
-                    />
-                  </View>
-                </View>
-                <View style={[styles.modalField, { flex: 1 }]}>
-                  <Text style={styles.modalLabel}>Duration (min)</Text>
-                  <View style={styles.modalInputWrap}>
-                    <TextInput
-                      placeholder="60"
-                      placeholderTextColor={palette.textMuted}
-                      style={styles.modalInput}
-                      value={form.duration}
-                      onChangeText={(v) => setForm((current) => ({ ...current, duration: v.replace(/[^0-9]/g, '') }))}
-                      keyboardType="number-pad"
-                    />
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.modalField}>
-                <Text style={styles.modalLabel}>Short Description</Text>
-                <View style={styles.modalInputWrap}>
-                  <TextInput
-                    placeholder="e.g. Includes wash and blow-dry"
-                    placeholderTextColor={palette.textMuted}
-                    style={styles.modalInput}
-                    value={form.description}
-                    onChangeText={(v) => setForm((current) => ({ ...current, description: v }))}
-                  />
-                </View>
-              </View>
-
-              <GoldButton
-                label={isEditing ? 'Save Changes' : 'Add Service'}
-                onPress={handleSave}
-                style={styles.modalBtn}
-                size="lg"
+        <View style={styles.rowFields}>
+          <View style={[styles.modalField, { flex: 1 }]}>
+            <Text style={styles.modalLabel}>Price (Ksh) *</Text>
+            <InputFocusWrap style={styles.modalInputWrap}>
+              <TextInput
+                placeholder="0"
+                placeholderTextColor={palette.textMuted}
+                style={styles.modalInput}
+                value={form.price}
+                onChangeText={(v) => setForm((current) => ({ ...current, price: v.replace(/[^0-9]/g, '') }))}
+                keyboardType="number-pad"
+                onFocus={scrollFormFieldIntoView}
               />
-            </ScrollView>
+            </InputFocusWrap>
           </View>
-        </KeyboardAvoidingView>
-      )}
+          <View style={[styles.modalField, { flex: 1 }]}>
+            <Text style={styles.modalLabel}>Duration (min)</Text>
+            <InputFocusWrap style={styles.modalInputWrap}>
+              <TextInput
+                placeholder="60"
+                placeholderTextColor={palette.textMuted}
+                style={styles.modalInput}
+                value={form.duration}
+                onChangeText={(v) => setForm((current) => ({ ...current, duration: v.replace(/[^0-9]/g, '') }))}
+                keyboardType="number-pad"
+                onFocus={scrollFormFieldIntoView}
+              />
+            </InputFocusWrap>
+          </View>
+        </View>
+
+        <View style={styles.modalField}>
+          <Text style={styles.modalLabel}>Short Description (optional)</Text>
+          <InputFocusWrap style={styles.modalInputWrap}>
+            <TextInput
+              placeholder="e.g. Includes wash and blow-dry"
+              placeholderTextColor={palette.textMuted}
+              style={styles.modalTextArea}
+              value={form.description}
+              onChangeText={(v) => setForm((current) => ({ ...current, description: v }))}
+              onFocus={scrollFormFieldIntoView}
+              multiline
+              blurOnSubmit
+            />
+          </InputFocusWrap>
+        </View>
+
+        <GoldButton
+          label={isEditing ? 'Save Changes' : 'Add Service'}
+          onPress={handleSave}
+          style={styles.modalBtn}
+          size="lg"
+        />
+      </KeyboardAwareSheet>
 
       <ConfirmModal
         visible={!!deleteConfirm}

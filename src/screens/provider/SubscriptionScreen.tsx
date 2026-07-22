@@ -575,7 +575,7 @@ export default function SubscriptionScreen({ navigation }: any) {
               ) : null}
 
               <GoldButton
-                label={amount > 0 ? `Pay via M-Pesa - Ksh ${amount.toLocaleString()}` : 'Credit covers renewal'}
+                label={amount > 0 ? `Pay Ksh ${amount.toLocaleString()} with M-Pesa` : 'Credit covers renewal'}
                 onPress={handlePayment}
                 loading={paying}
                 style={styles.payBtn}

@@ -20,6 +20,7 @@ import Toast from '../../components/Toast';
 import { useModalManager } from '../../hooks/useModalManager';
 import { toProviderAppointmentCard, ProviderAppointmentStatus } from '../../lib/api/bookings';
 import { openPhoneNumber, openWhatsAppContact } from '../../lib/contactActions';
+import { useAppStore } from '../../store/appStore';
 import { useBookingDataStore } from '../../store/bookingDataStore';
 
 async function callPhone(phone: string, showInfo: (title: string, message: string) => void) {
@@ -215,8 +216,13 @@ export default function AppointmentDetailScreen({ navigation, route }: any) {
 
   const executeAction = async () => {
     if (!confirm) return;
+    const pending = confirm;
+    setConfirm(null);
+
     try {
-      await updateBookingStatus(appointment.id, actionToBackend(confirm.action));
+      await updateBookingStatus(appointment.id, actionToBackend(pending.action));
+      void useAppStore.getState().hydrateProviderNotifications({ force: true });
+
       const msgs: Record<ProviderAppointmentStatus, string> = {
         upcoming: 'Booking accepted.',
         declined: 'Booking declined.',
@@ -224,14 +230,12 @@ export default function AppointmentDetailScreen({ navigation, route }: any) {
         cancelled: 'Appointment cancelled.',
         pending: '',
       };
-      setToast({ visible: true, message: msgs[confirm.action], type: 'success' });
-      if (confirm.action !== 'completed') {
-        setTimeout(() => navigation.goBack(), 1200);
+      setToast({ visible: true, message: msgs[pending.action], type: 'success' });
+      if (pending.action !== 'completed') {
+        setTimeout(() => navigation.goBack(), 450);
       }
     } catch (error: any) {
       showInfo('Could Not Update Booking', error?.message ?? 'Please try again.');
-    } finally {
-      setConfirm(null);
     }
   };
 

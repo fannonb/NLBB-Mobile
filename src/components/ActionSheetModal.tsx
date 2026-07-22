@@ -24,37 +24,45 @@ function createActionSheetStyles(p: ColorPalette, s: ShadowPalette) {
     overlay: {
       flex: 1,
       backgroundColor: p.overlayDark,
-      alignItems: 'center',
       justifyContent: 'flex-end',
     },
     container: {
       backgroundColor: p.card,
       borderTopLeftRadius: Radius.xl,
       borderTopRightRadius: Radius.xl,
-      paddingHorizontal: 0,
-      paddingTop: 16,
+      paddingTop: 10,
       paddingBottom: 32,
       width: '100%',
       maxHeight: '80%',
-      borderTopWidth: 1,
-      borderTopColor: p.border,
+      borderWidth: 1,
+      borderBottomWidth: 0,
+      borderColor: p.border,
+      ...s.card,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 44,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: p.border,
+      marginBottom: 14,
     },
     header: {
       paddingHorizontal: 24,
-      paddingBottom: 16,
+      paddingBottom: 14,
       borderBottomWidth: 1,
       borderBottomColor: p.borderLight,
     },
     title: {
       fontFamily: Fonts.serifMedium,
-      fontSize: 18,
+      fontSize: 20,
       color: p.textPrimary,
       textAlign: 'center',
-      fontWeight: '600',
+      letterSpacing: 0.2,
     },
     optionsWrapper: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
     },
     option: {
       flexDirection: 'row',
@@ -66,24 +74,25 @@ function createActionSheetStyles(p: ColorPalette, s: ShadowPalette) {
       marginBottom: 8,
       gap: 12,
       borderWidth: 1,
-      borderColor: p.borderLight,
+      borderColor: p.border,
     },
     optionDanger: {
-      backgroundColor: 'rgba(220,38,38,0.08)',
-      borderColor: 'rgba(220,38,38,0.2)',
+      backgroundColor: 'rgba(212,48,48,0.08)',
+      borderColor: 'rgba(212,48,48,0.22)',
     },
     optionIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: p.bg,
+      width: 40,
+      height: 40,
+      borderRadius: Radius.md,
+      backgroundColor: p.goldDim,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: p.borderLight,
+      borderColor: p.goldBorder,
     },
     optionIconDanger: {
-      backgroundColor: 'rgba(220,38,38,0.12)',
+      backgroundColor: 'rgba(212,48,48,0.12)',
+      borderColor: 'rgba(212,48,48,0.2)',
     },
     optionContent: {
       flex: 1,
@@ -92,33 +101,25 @@ function createActionSheetStyles(p: ColorPalette, s: ShadowPalette) {
       fontFamily: Fonts.sansMedium,
       fontSize: 14,
       color: p.textPrimary,
-      fontWeight: '500',
     },
     optionLabelDanger: {
       color: p.error,
       fontFamily: Fonts.sansBold,
     },
-    optionSub: {
-      fontFamily: Fonts.sans,
-      fontSize: 12,
-      color: p.textSecondary,
-      marginTop: 4,
-    },
     cancelBtn: {
-      marginHorizontal: 12,
-      marginTop: 8,
+      marginHorizontal: 16,
+      marginTop: 4,
       backgroundColor: p.bg,
-      borderRadius: Radius.lg,
+      borderRadius: Radius.md,
       paddingVertical: 14,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: p.borderLight,
+      borderColor: p.border,
     },
     cancelBtnText: {
       fontFamily: Fonts.sansMedium,
       fontSize: 14,
-      color: p.textPrimary,
-      fontWeight: '500',
+      color: p.textSecondary,
     },
   });
 }
@@ -141,12 +142,14 @@ export default function ActionSheetModal({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
       <View style={styles.overlay}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onDismiss} />
         <View style={styles.container}>
-          {title && (
+          <View style={styles.handle} />
+          {title ? (
             <View style={styles.header}>
               <Text style={styles.title}>{title}</Text>
             </View>
-          )}
+          ) : null}
 
           <ScrollView
             contentContainerStyle={styles.optionsWrapper}
@@ -158,7 +161,7 @@ export default function ActionSheetModal({
                 key={option.id}
                 style={[styles.option, option.isDanger && styles.optionDanger]}
                 onPress={() => handleOptionPress(option.onPress)}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
                 <View style={[styles.optionIcon, option.isDanger && styles.optionIconDanger]}>
                   <Feather
@@ -181,7 +184,7 @@ export default function ActionSheetModal({
             ))}
           </ScrollView>
 
-          <TouchableOpacity style={styles.cancelBtn} onPress={onDismiss} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={onDismiss} activeOpacity={0.85}>
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
         </View>

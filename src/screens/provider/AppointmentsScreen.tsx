@@ -17,10 +17,12 @@ import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import EmptyState from '../../components/EmptyState';
 import ConfirmModal from '../../components/ConfirmModal';
 import InfoModal from '../../components/InfoModal';
+import ProviderNotifButton from '../../components/ProviderNotifButton';
 import Toast from '../../components/Toast';
 import { toProviderAppointmentCard, ProviderAppointmentCard, ProviderAppointmentStatus } from '../../lib/api/bookings';
 import { openPhoneNumber, openWhatsAppContact } from '../../lib/contactActions';
 import { useBookingDataStore } from '../../store/bookingDataStore';
+import { useAppStore } from '../../store/appStore';
 
 type TabType = 'all' | ProviderAppointmentStatus;
 type ManageableAppointmentStatus = Exclude<ProviderAppointmentStatus, 'pending'>;
@@ -65,10 +67,10 @@ function createAppointmentsStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: p.bg },
     header: {
-      flexDirection: 'row', alignItems: 'center',
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: 24, paddingVertical: 12,
     },
-    heading: { fontFamily: Fonts.serifMedium, fontSize: 24, color: p.textPrimary },
+    heading: { fontFamily: Fonts.serifMedium, fontSize: 24, color: p.textPrimary, flex: 1 },
     tabsContainer: { borderBottomWidth: 1, borderBottomColor: p.border, maxHeight: 52 },
     tabs: { paddingHorizontal: 24, gap: 4 },
     tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingBottom: 14, paddingTop: 4 },
@@ -166,6 +168,7 @@ export default function AppointmentsScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       void loadMyBookings();
+      void useAppStore.getState().hydrateProviderNotifications({ force: true });
     }, [loadMyBookings])
   );
 
@@ -209,8 +212,12 @@ export default function AppointmentsScreen({ navigation }: any) {
 
   const executeAction = async () => {
     if (!confirm) return;
+    const pending = confirm;
+    setConfirm(null);
+
     try {
-      await updateBookingStatus(confirm.id, toBackendAction(confirm.action));
+      await updateBookingStatus(pending.id, toBackendAction(pending.action));
+      void useAppStore.getState().hydrateProviderNotifications({ force: true });
 
       const messages: Record<ProviderAppointmentStatus, string> = {
         upcoming: 'Booking accepted - client notified.',
@@ -219,11 +226,9 @@ export default function AppointmentsScreen({ navigation }: any) {
         cancelled: 'Appointment cancelled.',
         pending: '',
       };
-      showToast(messages[confirm.action] || 'Status updated.');
+      showToast(messages[pending.action] || 'Status updated.');
     } catch (error: any) {
       showInfo('Could Not Update Booking', error?.message ?? 'Please try again.');
-    } finally {
-      setConfirm(null);
     }
   };
 
@@ -246,6 +251,7 @@ export default function AppointmentsScreen({ navigation }: any) {
 
       <View style={styles.header}>
         <Text style={styles.heading}>Appointments</Text>
+        <ProviderNotifButton />
       </View>
 
       <ScrollView

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
@@ -11,6 +10,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../constants/theme';
 import { useThemedColors, useThemedShadows } from '../hooks/useThemedColors';
+import InputFocusWrap from './InputFocusWrap';
+import KeyboardAwareSheet from './KeyboardAwareSheet';
 
 interface ChangePasswordModalProps {
   visible: boolean;
@@ -28,21 +29,17 @@ export interface ChangePasswordResult {
 
 function createChangePasswordStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-    },
     container: {
-      backgroundColor: p.bg,
+      backgroundColor: p.card,
       borderTopLeftRadius: Radius.xl,
       borderTopRightRadius: Radius.xl,
+      borderWidth: 1,
+      borderBottomWidth: 0,
+      borderColor: p.border,
       paddingHorizontal: 24,
       paddingTop: 24,
-      paddingBottom: 32,
       width: '100%',
-      maxHeight: '85%',
+      ...s.card,
     },
     header: {
       flexDirection: 'row',
@@ -97,6 +94,8 @@ function createChangePasswordStyles(p: ColorPalette, s: ShadowPalette) {
     },
     input: {
       flex: 1,
+      minWidth: 0,
+      alignSelf: 'stretch',
       color: p.textPrimary,
       fontFamily: Fonts.sans,
       fontSize: 14,
@@ -276,121 +275,124 @@ export default function ChangePasswordModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Change Password</Text>
-            <TouchableOpacity style={styles.closeBtn} onPress={handleClose}>
-              <Feather name="x" size={18} color={palette.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.subtitle}>
-            For your security, create a strong password with a mix of characters.
-          </Text>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Current Password</Text>
-            <View style={[styles.inputWrap, errors.currentPassword && styles.inputWrapError]}>
-              <Feather name="lock" size={16} color={palette.textSecondary} />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter current password"
-                placeholderTextColor={palette.textMuted}
-                secureTextEntry={!showCurrent}
-                value={currentPassword}
-                onChangeText={(text) => {
-                  setCurrentPassword(text);
-                  setErrors((e) => ({ ...e, currentPassword: '' }));
-                }}
-              />
-              <TouchableOpacity
-                style={styles.eyeBtn}
-                onPress={() => setShowCurrent(!showCurrent)}
-              >
-                <Feather name={showCurrent ? 'eye-off' : 'eye'} size={16} color={palette.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            {errors.currentPassword && <Text style={styles.errorText}>{errors.currentPassword}</Text>}
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>New Password</Text>
-            <View style={[styles.inputWrap, errors.newPassword && styles.inputWrapError]}>
-              <Feather name="lock" size={16} color={palette.textSecondary} />
-              <TextInput
-                style={styles.input}
-                placeholder="Create new password"
-                placeholderTextColor={palette.textMuted}
-                secureTextEntry={!showNew}
-                value={newPassword}
-                onChangeText={(text) => {
-                  setNewPassword(text);
-                  setErrors((e) => ({ ...e, newPassword: '' }));
-                }}
-              />
-              <TouchableOpacity
-                style={styles.eyeBtn}
-                onPress={() => setShowNew(!showNew)}
-              >
-                <Feather name={showNew ? 'eye-off' : 'eye'} size={16} color={palette.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            {errors.newPassword && <Text style={styles.errorText}>{errors.newPassword}</Text>}
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Confirm New Password</Text>
-            <View style={[styles.inputWrap, errors.confirmPassword && styles.inputWrapError]}>
-              <Feather name="lock" size={16} color={palette.textSecondary} />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm new password"
-                placeholderTextColor={palette.textMuted}
-                secureTextEntry={!showConfirm}
-                value={confirmPassword}
-                onChangeText={(text) => {
-                  setConfirmPassword(text);
-                  setErrors((e) => ({ ...e, confirmPassword: '' }));
-                }}
-              />
-              <TouchableOpacity
-                style={styles.eyeBtn}
-                onPress={() => setShowConfirm(!showConfirm)}
-              >
-                <Feather name={showConfirm ? 'eye-off' : 'eye'} size={16} color={palette.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-          </View>
-
-          <View style={styles.hint}>
-            <Feather name="check-circle" size={14} color={palette.success} />
-            <Text style={styles.hintText}>
-              Your password must contain at least 8 characters, one uppercase letter, one number, and one special character.
-            </Text>
-          </View>
-
-          <View style={styles.buttonGroup}>
-            <TouchableOpacity
-              style={[styles.changeBtn, !canSubmit && styles.changeBtnDisabled]}
-              onPress={handleChangePassword}
-              disabled={!canSubmit || loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color={palette.bg} size="small" />
-              ) : (
-                <Text style={styles.changeBtnText}>Change Password</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} activeOpacity={0.8}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+    <KeyboardAwareSheet
+      visible={visible}
+      onClose={handleClose}
+      sheetStyle={styles.container}
+      maxHeight="90%"
+      bottomPadding={24}
+      overlayStyle={{ backgroundColor: palette.overlayDark }}
+    >
+      <View style={styles.header}>
+        <Text style={styles.title}>Change Password</Text>
+        <TouchableOpacity style={styles.closeBtn} onPress={handleClose}>
+          <Feather name="x" size={18} color={palette.textSecondary} />
+        </TouchableOpacity>
       </View>
-    </Modal>
+
+      <Text style={styles.subtitle}>
+        For your security, create a strong password with a mix of characters.
+      </Text>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Current Password</Text>
+        <InputFocusWrap style={[styles.inputWrap, errors.currentPassword && styles.inputWrapError]}>
+          <Feather name="lock" size={16} color={palette.textSecondary} />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter current password"
+            placeholderTextColor={palette.textMuted}
+            secureTextEntry={!showCurrent}
+            value={currentPassword}
+            onChangeText={(text) => {
+              setCurrentPassword(text);
+              setErrors((e) => ({ ...e, currentPassword: '' }));
+            }}
+          />
+          <TouchableOpacity
+            style={styles.eyeBtn}
+            onPress={() => setShowCurrent(!showCurrent)}
+          >
+            <Feather name={showCurrent ? 'eye-off' : 'eye'} size={16} color={palette.textSecondary} />
+          </TouchableOpacity>
+        </InputFocusWrap>
+        {errors.currentPassword && <Text style={styles.errorText}>{errors.currentPassword}</Text>}
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>New Password</Text>
+        <InputFocusWrap style={[styles.inputWrap, errors.newPassword && styles.inputWrapError]}>
+          <Feather name="lock" size={16} color={palette.textSecondary} />
+          <TextInput
+            style={styles.input}
+            placeholder="Create new password"
+            placeholderTextColor={palette.textMuted}
+            secureTextEntry={!showNew}
+            value={newPassword}
+            onChangeText={(text) => {
+              setNewPassword(text);
+              setErrors((e) => ({ ...e, newPassword: '' }));
+            }}
+          />
+          <TouchableOpacity
+            style={styles.eyeBtn}
+            onPress={() => setShowNew(!showNew)}
+          >
+            <Feather name={showNew ? 'eye-off' : 'eye'} size={16} color={palette.textSecondary} />
+          </TouchableOpacity>
+        </InputFocusWrap>
+        {errors.newPassword && <Text style={styles.errorText}>{errors.newPassword}</Text>}
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Confirm New Password</Text>
+        <InputFocusWrap style={[styles.inputWrap, errors.confirmPassword && styles.inputWrapError]}>
+          <Feather name="lock" size={16} color={palette.textSecondary} />
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm new password"
+            placeholderTextColor={palette.textMuted}
+            secureTextEntry={!showConfirm}
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              setErrors((e) => ({ ...e, confirmPassword: '' }));
+            }}
+          />
+          <TouchableOpacity
+            style={styles.eyeBtn}
+            onPress={() => setShowConfirm(!showConfirm)}
+          >
+            <Feather name={showConfirm ? 'eye-off' : 'eye'} size={16} color={palette.textSecondary} />
+          </TouchableOpacity>
+        </InputFocusWrap>
+        {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+      </View>
+
+      <View style={styles.hint}>
+        <Feather name="check-circle" size={14} color={palette.success} />
+        <Text style={styles.hintText}>
+          Your password must contain at least 8 characters, one uppercase letter, one number, and one special character.
+        </Text>
+      </View>
+
+      <View style={styles.buttonGroup}>
+        <TouchableOpacity
+          style={[styles.changeBtn, !canSubmit && styles.changeBtnDisabled]}
+          onPress={handleChangePassword}
+          disabled={!canSubmit || loading}
+          activeOpacity={0.85}
+        >
+          {loading ? (
+            <ActivityIndicator color={palette.bg} size="small" />
+          ) : (
+            <Text style={styles.changeBtnText}>Change Password</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} activeOpacity={0.8}>
+          <Text style={styles.cancelBtnText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAwareSheet>
   );
 }

@@ -27,7 +27,9 @@ function createGoldButtonStyles(p: ColorPalette, s: ShadowPalette) {
       borderRadius: Radius.md,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 24,
+      alignSelf: 'stretch',
+      minHeight: 52,
+      paddingHorizontal: 16,
       ...s.gold,
     },
     label: {
@@ -35,6 +37,7 @@ function createGoldButtonStyles(p: ColorPalette, s: ShadowPalette) {
       fontFamily: Fonts.sansBold,
       fontWeight: '700',
       letterSpacing: 0.2,
+      textAlign: 'center',
     },
     disabled: {
       opacity: 0.5,
@@ -72,7 +75,14 @@ export default function GoldButton({
       {loading ? (
         <ActivityIndicator color={palette.bg} size="small" />
       ) : (
-        <Text style={[styles.label, { fontSize }, textStyle]}>{label}</Text>
+        <Text
+          style={[styles.label, { fontSize }, textStyle]}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
+        >
+          {label}
+        </Text>
       )}
     </TouchableOpacity>
   );

@@ -10,6 +10,7 @@ import {
 import * as Location from 'expo-location';
 import { Feather } from '@expo/vector-icons';
 import { Colors, Fonts, Radius } from '../constants/theme';
+import InputFocusWrap from './InputFocusWrap';
 
 export type PickedProviderLocation = {
   label: string;
@@ -423,7 +424,7 @@ export default function ProviderLocationPicker({
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputWrap}>
+      <InputFocusWrap style={styles.inputWrap} disabled={!editable || resolving}>
         <Feather name="map-pin" size={16} color={Colors.textSecondary} />
         <TextInput
           value={value}
@@ -446,7 +447,7 @@ export default function ProviderLocationPicker({
             <Feather name="navigation" size={15} color={Colors.gold} />
           )}
         </TouchableOpacity>
-      </View>
+      </InputFocusWrap>
 
       {editable && (
         <TouchableOpacity
@@ -529,7 +530,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  input: { flex: 1, color: Colors.textPrimary, fontFamily: Fonts.sans, fontSize: 14, padding: 0 },
+  input: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
+    color: Colors.textPrimary,
+    fontFamily: Fonts.sans,
+    fontSize: 14,
+    padding: 0,
+  },
   locateBtn: {
     width: 28,
     height: 28,

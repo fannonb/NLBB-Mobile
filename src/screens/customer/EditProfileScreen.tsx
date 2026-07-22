@@ -3,13 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   TextInput,
   Image,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -20,6 +17,7 @@ import { useAuthStore } from '../../store/authStore';
 import ChangePasswordModal, { ChangePasswordResult } from '../../components/ChangePasswordModal';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
 import ActionSheetModal, { ActionSheetOption } from '../../components/ActionSheetModal';
+import KeyboardAwareScrollView from '../../components/KeyboardAwareScrollView';
 import { useModalManager } from '../../hooks/useModalManager';
 import { authApi } from '../../lib/api/auth';
 import { isApiClientError } from '../../lib/api/client';
@@ -354,10 +352,7 @@ export default function EditProfileScreen({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Feather name="arrow-left" size={20} color={palette.textPrimary} />
@@ -366,7 +361,7 @@ export default function EditProfileScreen({ navigation }: any) {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll} bottomPadding={40}>
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrap}>
             {form.avatar ? (
@@ -479,7 +474,7 @@ export default function EditProfileScreen({ navigation }: any) {
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <ChangePasswordModal
         visible={changePasswordVisible}
@@ -497,6 +492,6 @@ export default function EditProfileScreen({ navigation }: any) {
         options={modal.data ?? []}
         onDismiss={hideModal}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }

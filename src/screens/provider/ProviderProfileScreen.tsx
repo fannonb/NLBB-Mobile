@@ -7,8 +7,6 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   Switch,
   ActivityIndicator,
 } from 'react-native';
@@ -26,7 +24,10 @@ import {
   normalizeSocialLink,
   SocialPlatform,
 } from '../../lib/socialLinks';
+import InputFocusWrap from '../../components/InputFocusWrap';
 import ProviderLocationPicker, { PickedProviderLocation } from '../../components/ProviderLocationPicker';
+import ProviderNotifButton from '../../components/ProviderNotifButton';
+import KeyboardAwareScrollView from '../../components/KeyboardAwareScrollView';
 import { useAuthStore } from '../../store/authStore';
 import { useAppStore, ProviderProfile, WorkingHours } from '../../store/appStore';
 import Toast from '../../components/Toast';
@@ -40,7 +41,6 @@ import { providerManagementApi, ProviderProfilePayload } from '../../lib/api/pro
 import { authApi } from '../../lib/api/auth';
 import { providerApi } from '../../lib/api/providers';
 import { openExternalUrl } from '../../lib/contactActions';
-import { notificationsApi } from '../../lib/api/notifications';
 
 const DEFAULT_COVER =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
@@ -61,6 +61,29 @@ const PROFILE_SECTIONS: { key: ProfileSection; label: string }[] = [
   { key: 'hours', label: 'Hours' },
   { key: 'social', label: 'Social' },
 ];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type ProfileGap = { section: ProfileSection; label: string };
+
+const collectProfileGaps = (
+  form: ProviderProfile,
+  selectedCategories: string[],
+  ownerName: string,
+  accountEmail: string
+): ProfileGap[] => {
+  const gaps: ProfileGap[] = [];
+  if (!form.businessName.trim()) gaps.push({ section: 'basics', label: 'Business name' });
+  if (selectedCategories.length === 0) gaps.push({ section: 'basics', label: 'Category' });
+  if (!form.location.trim()) gaps.push({ section: 'basics', label: 'Location' });
+  if (form.description.trim().length < 10) gaps.push({ section: 'basics', label: 'Description (10+ chars)' });
+  if (!form.phone.trim()) gaps.push({ section: 'basics', label: 'Phone number' });
+  if (!ownerName.trim()) gaps.push({ section: 'social', label: 'Owner name' });
+  if (!accountEmail.trim() || !EMAIL_RE.test(accountEmail.trim())) {
+    gaps.push({ section: 'social', label: 'Account email' });
+  }
+  return gaps;
+};
 const EMPTY_PROVIDER_PROFILE: ProviderProfile = {
   businessName: '',
   description: '',
@@ -227,7 +250,6 @@ const normalizeWorkingHoursForSave = (hours: WorkingHours[]) =>
   });
 
 const cloneHours = (hours: WorkingHours[]) => hours.map((day) => ({ ...day }));
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type MediaTarget = 'cover' | 'avatar' | 'gallery';
 type MediaSource = 'camera' | 'gallery';
@@ -238,8 +260,11 @@ export default function ProviderProfileScreen({ navigation }: any) {
   const shadow = useThemedShadows();
   const styles = useMemo(() => createProfileStyles(palette, shadow), [palette, shadow]);
   const fStyles = useMemo(() => fieldStyles(palette), [palette]);
-  const { logout, user, refreshCurrentUser } = useAuthStore();
-  const { updateProviderProfile, updateWorkingHours } = useAppStore();
+  const logout = useAuthStore((s) => s.logout);
+  const user = useAuthStore((s) => s.user);
+  const refreshCurrentUser = useAuthStore((s) => s.refreshCurrentUser);
+  const updateProviderProfile = useAppStore((s) => s.updateProviderProfile);
+  const updateWorkingHours = useAppStore((s) => s.updateWorkingHours);
 
   const [isEditing, setIsEditing] = useState(false);
   const [activeSection, setActiveSection] = useState<ProfileSection>('basics');
@@ -251,6 +276,7 @@ export default function ProviderProfileScreen({ navigation }: any) {
   const [selectedLocation, setSelectedLocation] = useState<PickedProviderLocation | null>(null);
   const [lastSavedSelectedLocation, setLastSavedSelectedLocation] = useState<PickedProviderLocation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileReady, setProfileReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [changePasswordVisible, setChangePasswordVisible] = useState(false);
@@ -265,7 +291,6 @@ export default function ProviderProfileScreen({ navigation }: any) {
     type: 'success',
   });
   const { modal, showSuccess, showError, showInfo, showActionSheet, hideModal } = useModalManager();
-  const [sendingTestPush, setSendingTestPush] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -331,6 +356,7 @@ export default function ProviderProfileScreen({ navigation }: any) {
       } finally {
         if (active) {
           setLoading(false);
+          setProfileReady(true);
         }
       }
     };
@@ -370,49 +396,83 @@ export default function ProviderProfileScreen({ navigation }: any) {
     }
   };
 
-  const sendTestPush = async () => {
-    setSendingTestPush(true);
-    try {
-      await notificationsApi.sendTestPush({
-        title: 'NLBB push test',
-        body: 'If this appears, push notifications are working correctly on your device.',
-      });
-      showSuccess('Test Push Sent', 'We sent a test notification to this device. Watch for it now.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to send the test push right now.';
-      showError('Push Test Failed', message);
-    } finally {
-      setSendingTestPush(false);
+  const profileGaps = useMemo(() => {
+    if (!profileReady) {
+      return [] as ProfileGap[];
     }
-  };
+    return collectProfileGaps(form, selectedCategories, ownerName, accountEmail);
+  }, [profileReady, form, selectedCategories, ownerName, accountEmail]);
+
+  const incompleteSections = useMemo(
+    () => new Set(profileGaps.map((gap) => gap.section)),
+    [profileGaps]
+  );
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (ownerName !== lastSavedOwnerName || accountEmail !== lastSavedAccountEmail) {
+      return true;
+    }
+    if (form.businessName !== lastSavedForm.businessName) return true;
+    if (form.description !== lastSavedForm.description) return true;
+    if (form.phone !== lastSavedForm.phone) return true;
+    if (form.whatsapp !== lastSavedForm.whatsapp) return true;
+    if (form.instagram !== lastSavedForm.instagram) return true;
+    if (form.facebook !== lastSavedForm.facebook) return true;
+    if (form.location !== lastSavedForm.location) return true;
+    if (form.category !== lastSavedForm.category) return true;
+    if (form.coverImage !== lastSavedForm.coverImage) return true;
+    if (form.avatar !== lastSavedForm.avatar) return true;
+    if (form.mpesaPhone !== lastSavedForm.mpesaPhone) return true;
+    if (form.galleryImages.length !== lastSavedForm.galleryImages.length) return true;
+    if (form.galleryImages.some((uri, index) => uri !== lastSavedForm.galleryImages[index])) return true;
+    if (hours.length !== lastSavedHours.length) return true;
+    if (
+      hours.some((day, index) => {
+        const saved = lastSavedHours[index];
+        return (
+          !saved ||
+          day.day !== saved.day ||
+          day.isOpen !== saved.isOpen ||
+          day.openTime !== saved.openTime ||
+          day.closeTime !== saved.closeTime
+        );
+      })
+    ) {
+      return true;
+    }
+    const locLabel = selectedLocation?.label ?? '';
+    const savedLocLabel = lastSavedSelectedLocation?.label ?? '';
+    const locLat = selectedLocation?.coordinates?.lat;
+    const savedLocLat = lastSavedSelectedLocation?.coordinates?.lat;
+    const locLng = selectedLocation?.coordinates?.lng;
+    const savedLocLng = lastSavedSelectedLocation?.coordinates?.lng;
+    return locLabel !== savedLocLabel || locLat !== savedLocLat || locLng !== savedLocLng;
+  }, [
+    form,
+    lastSavedForm,
+    hours,
+    lastSavedHours,
+    ownerName,
+    lastSavedOwnerName,
+    accountEmail,
+    lastSavedAccountEmail,
+    selectedLocation,
+    lastSavedSelectedLocation,
+  ]);
 
   const handleSave = async () => {
-    if (
-      !form.businessName.trim() ||
-      !form.phone.trim() ||
-      selectedCategories.length === 0 ||
-      !form.location.trim() ||
-      form.description.trim().length < 10
-    ) {
-      setToast({
-        visible: true,
-        message: 'Add business name, category, location, phone, and a description of at least 10 characters.',
-        type: 'error',
-      });
+    // Exit edit mode quietly when nothing changed — don't force filling every field.
+    if (!hasUnsavedChanges) {
+      setIsEditing(false);
       return;
     }
-    if (!ownerName.trim()) {
+
+    const gaps = collectProfileGaps(form, selectedCategories, ownerName, accountEmail);
+    if (gaps.length > 0) {
+      setActiveSection(gaps[0].section);
       setToast({
         visible: true,
-        message: 'Account name is required.',
-        type: 'error',
-      });
-      return;
-    }
-    if (!accountEmail.trim() || !EMAIL_RE.test(accountEmail.trim())) {
-      setToast({
-        visible: true,
-        message: 'Enter a valid account email.',
+        message: `Complete: ${gaps.map((gap) => gap.label).join(', ')}.`,
         type: 'error',
       });
       return;
@@ -705,29 +765,36 @@ export default function ProviderProfileScreen({ navigation }: any) {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={() => setToast((t) => ({ ...t, visible: false }))} />
 
       <View style={styles.header}>
-        <Text style={styles.heading}>Business Profile</Text>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.heading}>Business Profile</Text>
+          {isEditing ? (
+            <Text style={styles.editingHint}>
+              {hasUnsavedChanges ? 'Unsaved changes' : 'No changes yet — Cancel anytime'}
+            </Text>
+          ) : null}
+        </View>
         {isEditing ? (
-          <View style={styles.editBtns}>
-            <TouchableOpacity onPress={handleCancel} style={styles.cancelEditBtn} disabled={saving || uploadingMedia}>
-              <Text style={styles.cancelEditText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleSave} style={styles.saveBtn} disabled={saving || uploadingMedia}>
-              {saving ? <ActivityIndicator size="small" color={palette.bg} /> : <Feather name="check" size={16} color={palette.bg} />}
-              <Text style={styles.saveBtnText}>Save</Text>
+          <TouchableOpacity onPress={handleCancel} style={styles.cancelEditBtn} disabled={saving || uploadingMedia}>
+            <Text style={styles.cancelEditText}>Cancel</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerActions}>
+            <ProviderNotifButton />
+            <TouchableOpacity
+              onPress={() => {
+                setIsEditing(true);
+                setActiveSection(profileGaps[0]?.section ?? 'basics');
+              }}
+              style={styles.editBtn}
+            >
+              <Feather name="edit-2" size={16} color={palette.gold} />
+              <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <TouchableOpacity onPress={() => { setIsEditing(true); setActiveSection('basics'); }} style={styles.editBtn}>
-            <Feather name="edit-2" size={16} color={palette.gold} />
-            <Text style={styles.editBtnText}>Edit</Text>
-          </TouchableOpacity>
         )}
       </View>
 
@@ -738,22 +805,32 @@ export default function ProviderProfileScreen({ navigation }: any) {
           style={styles.sectionTabsContainer}
           contentContainerStyle={styles.sectionTabs}
         >
-          {PROFILE_SECTIONS.map((section) => (
-            <TouchableOpacity
-              key={section.key}
-              onPress={() => setActiveSection(section.key)}
-              style={[styles.sectionTab, activeSection === section.key && styles.sectionTabActive]}
-            >
-              <Text
+          {PROFILE_SECTIONS.map((section) => {
+            const incomplete = incompleteSections.has(section.key);
+            const active = activeSection === section.key;
+            return (
+              <TouchableOpacity
+                key={section.key}
+                onPress={() => setActiveSection(section.key)}
                 style={[
-                  styles.sectionTabText,
-                  activeSection === section.key && styles.sectionTabTextActive,
+                  styles.sectionTab,
+                  active && styles.sectionTabActive,
+                  incomplete && styles.sectionTabIncomplete,
                 ]}
               >
-                {section.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.sectionTabText,
+                    active && styles.sectionTabTextActive,
+                    incomplete && styles.sectionTabTextIncomplete,
+                  ]}
+                >
+                  {section.label}
+                </Text>
+                {incomplete ? <View style={styles.sectionTabDot} /> : null}
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       ) : null}
 
@@ -770,11 +847,35 @@ export default function ProviderProfileScreen({ navigation }: any) {
         </View>
       )}
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
+      <KeyboardAwareScrollView
         style={styles.mainScroll}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, isEditing && { paddingBottom: 120 }]}
+        bottomPadding={40}
       >
+        {profileReady && !isEditing && profileGaps.length > 0 ? (
+          <TouchableOpacity
+            style={styles.completenessCard}
+            onPress={() => {
+              setIsEditing(true);
+              setActiveSection(profileGaps[0].section);
+            }}
+            activeOpacity={0.85}
+          >
+            <View style={styles.completenessIcon}>
+              <Feather name="alert-circle" size={18} color={palette.warning} />
+            </View>
+            <View style={styles.completenessBody}>
+              <Text style={styles.completenessTitle}>
+                {profileGaps.length} detail{profileGaps.length === 1 ? '' : 's'} still needed
+              </Text>
+              <Text style={styles.completenessText}>
+                Missing: {profileGaps.map((gap) => gap.label).join(', ')}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={palette.textMuted} />
+          </TouchableOpacity>
+        ) : null}
+
         <View style={styles.coverWrap}>
           <Image source={{ uri: resolveImageUri(form.coverImage, DEFAULT_COVER) }} style={styles.cover} />
           {isEditing && (
@@ -863,7 +964,12 @@ export default function ProviderProfileScreen({ navigation }: any) {
 
           <View style={styles.card}>
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Description</Text>
+              <Text style={styles.fieldLabel}>
+                Description{isEditing ? ' *' : ''}
+                {isEditing && form.description.trim().length < 10 ? (
+                  <Text style={styles.fieldHintBad}> · add at least 10 characters</Text>
+                ) : null}
+              </Text>
               <TextInput
                 multiline
                 numberOfLines={3}
@@ -873,10 +979,46 @@ export default function ProviderProfileScreen({ navigation }: any) {
                 style={[
                   styles.input,
                   styles.textArea,
-                  isEditing ? styles.inputEditableArea : styles.inputReadOnly
+                  isEditing ? styles.inputEditableArea : styles.inputReadOnly,
+                  isEditing && form.description.trim().length < 10 && styles.inputNeedsAttention,
                 ]}
               />
             </View>
+          </View>
+
+          <Text style={styles.groupLabel}>Customer Contact{isEditing ? ' *' : ''}</Text>
+          <View style={styles.card}>
+            <FieldRow
+              label="Phone"
+              icon="phone"
+              fStyles={fStyles}
+              palette={palette}
+              isEditable={isEditing}
+            >
+              <TextInput
+                placeholder="+254 712 345 678"
+                keyboardType="phone-pad"
+                {...f('phone')}
+                style={[
+                  styles.input,
+                  isEditing && !form.phone.trim() ? styles.inputNeedsAttention : null,
+                ]}
+              />
+            </FieldRow>
+            <FieldRow
+              label="WhatsApp"
+              icon="message-circle"
+              noBorder
+              fStyles={fStyles}
+              palette={palette}
+              isEditable={isEditing}
+            >
+              <TextInput
+                placeholder="Defaults to phone if empty"
+                keyboardType="phone-pad"
+                {...f('whatsapp')}
+              />
+            </FieldRow>
           </View>
             </>
           ) : null}
@@ -963,14 +1105,8 @@ export default function ProviderProfileScreen({ navigation }: any) {
 
           {showSection('social') ? (
             <>
-              <Text style={styles.groupLabel}>Contact Details</Text>
+              <Text style={styles.groupLabel}>Social Links</Text>
               <View style={styles.card}>
-                <FieldRow label="Phone" icon="phone" fStyles={fStyles} palette={palette} isEditable={isEditing}>
-                  <TextInput placeholder="+254 712 345 678" keyboardType="phone-pad" {...f('phone')} />
-                </FieldRow>
-                <FieldRow label="WhatsApp" icon="message-circle" fStyles={fStyles} palette={palette} isEditable={isEditing}>
-                  <TextInput placeholder="+254 712 345 678" keyboardType="phone-pad" {...f('whatsapp')} />
-                </FieldRow>
                 <FieldRow label="Instagram" icon="instagram" fStyles={fStyles} palette={palette} isEditable={isEditing}>
                   {isEditing ? (
                     <TextInput placeholder="https://instagram.com/yourbusiness" autoCapitalize="none" {...f('instagram')} />
@@ -1024,24 +1160,6 @@ export default function ProviderProfileScreen({ navigation }: any) {
                 </FieldRow>
               </View>
 
-              <TouchableOpacity
-                style={styles.settingsBtn}
-                onPress={sendTestPush}
-                disabled={sendingTestPush}
-                activeOpacity={0.85}
-              >
-                <Feather name="bell" size={18} color={palette.gold} />
-                <View style={styles.settingsBtnContent}>
-                  <Text style={styles.settingsBtnLabel}>
-                    {sendingTestPush ? 'Sending Test Push...' : 'Send Test Push'}
-                  </Text>
-                  <Text style={styles.settingsBtnSub}>
-                    Quickly verify push notifications on this device
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={palette.textMuted} />
-              </TouchableOpacity>
-
               {!isEditing ? (
                 <TouchableOpacity
                   style={styles.settingsBtn}
@@ -1074,7 +1192,33 @@ export default function ProviderProfileScreen({ navigation }: any) {
             </TouchableOpacity>
           ) : null}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
+
+      {isEditing ? (
+        <View style={[styles.editFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <TouchableOpacity
+            onPress={handleCancel}
+            style={styles.footerCancelBtn}
+            disabled={saving || uploadingMedia}
+          >
+            <Text style={styles.footerCancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSave}
+            style={[styles.footerSaveBtn, !hasUnsavedChanges && styles.footerSaveBtnMuted]}
+            disabled={saving || uploadingMedia}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={palette.bg} />
+            ) : (
+              <Feather name={hasUnsavedChanges ? 'check' : 'check-circle'} size={16} color={palette.bg} />
+            )}
+            <Text style={styles.footerSaveText}>
+              {hasUnsavedChanges ? 'Save Changes' : 'Done'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <ChangePasswordModal
         visible={changePasswordVisible}
@@ -1092,7 +1236,7 @@ export default function ProviderProfileScreen({ navigation }: any) {
         options={modal.data ?? []}
         onDismiss={hideModal}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -1108,37 +1252,40 @@ function FieldRow({
   isLocked?: boolean;
   isEditable?: boolean;
 }) {
+  const valueStyle = [
+    fStyles.valueWrap,
+    isEditable && {
+      backgroundColor: palette.cardInner,
+      borderColor: palette.border,
+      borderWidth: 1,
+      borderRadius: Radius.md,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      marginVertical: -4,
+    },
+    isLocked && {
+      opacity: 0.65,
+    },
+  ];
+
   return (
     <View style={[fStyles.row, noBorder && { borderBottomWidth: 0 }]}>
       <Text style={fStyles.label}>{label}</Text>
-      <View
-        style={[
-          fStyles.valueWrap,
-          isEditable && {
-            backgroundColor: palette.cardInner,
-            borderColor: palette.border,
-            borderWidth: 1,
-            borderRadius: Radius.md,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            marginVertical: -4,
-          },
-          isLocked && {
-            opacity: 0.65,
-          },
-        ]}
-      >
-        {icon && <Feather name={icon} size={13} color={palette.textMuted} style={{ marginRight: 6 }} />}
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+      {isEditable ? (
+        <InputFocusWrap style={valueStyle}>
+          {icon ? <Feather name={icon} size={13} color={palette.textMuted} style={{ marginRight: 6 }} /> : null}
           {children}
-        </View>
-        {isLocked && (
-          <Feather name="lock" size={12} color={palette.textMuted} style={{ marginLeft: 8 }} />
-        )}
-        {isEditable && (
           <Feather name="edit-2" size={12} color={palette.gold} style={{ marginLeft: 8 }} />
-        )}
-      </View>
+        </InputFocusWrap>
+      ) : (
+        <View style={valueStyle}>
+          {icon ? <Feather name={icon} size={13} color={palette.textMuted} style={{ marginRight: 6 }} /> : null}
+          {children}
+          {isLocked ? (
+            <Feather name="lock" size={12} color={palette.textMuted} style={{ marginLeft: 8 }} />
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }
@@ -1160,6 +1307,14 @@ const createProfileStyles = (p: ColorPalette, s: ShadowPalette) => StyleSheet.cr
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 24, paddingVertical: 12,
   },
+  headerTitleWrap: { flex: 1, paddingRight: 12 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  editingHint: {
+    color: p.textMuted,
+    fontFamily: Fonts.sans,
+    fontSize: 11,
+    marginTop: 2,
+  },
   loadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1169,8 +1324,41 @@ const createProfileStyles = (p: ColorPalette, s: ShadowPalette) => StyleSheet.cr
   },
   loadingText: { color: p.textSecondary, fontFamily: Fonts.sans, fontSize: 13 },
   heading: { fontFamily: Fonts.serifMedium, fontSize: 22, color: p.textPrimary },
+  completenessCard: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+    padding: 14,
+    borderRadius: Radius.lg,
+    backgroundColor: 'rgba(212,132,26,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(212,132,26,0.35)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  completenessIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: p.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completenessBody: { flex: 1 },
+  completenessTitle: {
+    color: p.textPrimary,
+    fontFamily: Fonts.sansBold,
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  completenessText: {
+    color: p.textSecondary,
+    fontFamily: Fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   sectionTabsContainer: {
-    height: 38,
+    height: 42,
     flexGrow: 0,
     flexShrink: 0,
     marginBottom: 12,
@@ -1188,10 +1376,16 @@ const createProfileStyles = (p: ColorPalette, s: ShadowPalette) => StyleSheet.cr
     borderWidth: 1,
     borderColor: p.border,
     alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   sectionTabActive: {
     backgroundColor: p.goldDim,
     borderColor: p.goldBorder,
+  },
+  sectionTabIncomplete: {
+    borderColor: 'rgba(212,132,26,0.55)',
   },
   sectionTabText: {
     color: p.textSecondary,
@@ -1202,24 +1396,88 @@ const createProfileStyles = (p: ColorPalette, s: ShadowPalette) => StyleSheet.cr
     color: p.gold,
     fontFamily: Fonts.sansBold,
   },
+  sectionTabTextIncomplete: {
+    color: p.warning,
+  },
+  sectionTabDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: p.warning,
+  },
   editBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 8,
     borderRadius: Radius.md, borderWidth: 1, borderColor: p.goldBorder,
   },
   editBtnText: { color: p.gold, fontFamily: Fonts.sansMedium, fontSize: 13 },
-  editBtns: { flexDirection: 'row', gap: 8 },
   cancelEditBtn: {
     paddingHorizontal: 14, paddingVertical: 8,
     borderRadius: Radius.md, borderWidth: 1, borderColor: p.border,
   },
   cancelEditText: { color: p.textSecondary, fontFamily: Fonts.sansMedium, fontSize: 13 },
-  saveBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: Radius.md, backgroundColor: p.gold, ...s.gold,
+  editFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    backgroundColor: p.bg,
+    borderTopWidth: 1,
+    borderTopColor: p.border,
   },
-  saveBtnText: { color: p.bg, fontFamily: Fonts.sansBold, fontSize: 13 },
+  footerCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: p.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: p.card,
+  },
+  footerCancelText: {
+    color: p.textSecondary,
+    fontFamily: Fonts.sansMedium,
+    fontSize: 14,
+  },
+  footerSaveBtn: {
+    flex: 1.4,
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: Radius.md,
+    backgroundColor: p.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...s.gold,
+  },
+  footerSaveBtnMuted: {
+    opacity: 0.85,
+  },
+  footerSaveText: {
+    color: p.bg,
+    fontFamily: Fonts.sansBold,
+    fontSize: 14,
+  },
+  fieldHintBad: {
+    color: p.warning,
+    fontFamily: Fonts.sans,
+    fontSize: 11,
+    textTransform: 'none',
+    letterSpacing: 0,
+  },
+  inputNeedsAttention: {
+    borderWidth: 1,
+    borderColor: 'rgba(212,132,26,0.65)',
+    borderRadius: Radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(212,132,26,0.06)',
+  },
   scroll: { paddingBottom: 40 },
   coverWrap: { height: 180, position: 'relative', marginBottom: 36 },
   cover: { width: '100%', height: '100%', resizeMode: 'cover' },
@@ -1336,7 +1594,16 @@ const createProfileStyles = (p: ColorPalette, s: ShadowPalette) => StyleSheet.cr
   },
   field: { paddingVertical: 12 },
   fieldLabel: { color: p.textMuted, fontSize: 11, fontFamily: Fonts.sansMedium, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
-  input: { color: p.textPrimary, fontFamily: Fonts.sans, fontSize: 14, flex: 1, padding: 0 },
+  input: {
+    color: p.textPrimary,
+    fontFamily: Fonts.sans,
+    fontSize: 14,
+    flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+  },
   linkText: {
     color: p.gold,
     fontFamily: Fonts.sansMedium,
@@ -1389,7 +1656,7 @@ const createProfileStyles = (p: ColorPalette, s: ShadowPalette) => StyleSheet.cr
   settingsBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: p.card, borderRadius: Radius.lg, paddingVertical: 14, paddingHorizontal: 16,
-    borderWidth: 1, borderColor: p.border, ...s.soft,
+    borderWidth: 1, borderColor: p.border, marginBottom: 12, ...s.soft,
   },
   settingsBtnContent: { flex: 1 },
   settingsBtnLabel: { color: p.textPrimary, fontFamily: Fonts.sansMedium, fontSize: 14, marginBottom: 2 },
@@ -1397,7 +1664,7 @@ const createProfileStyles = (p: ColorPalette, s: ShadowPalette) => StyleSheet.cr
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: p.card, borderRadius: Radius.lg, paddingVertical: 16,
-    borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)', marginBottom: 32, ...s.soft,
+    borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)', marginTop: 4, marginBottom: 32, ...s.soft,
   },
   logoutText: { color: p.error, fontFamily: Fonts.sansMedium, fontSize: 14 },
 });

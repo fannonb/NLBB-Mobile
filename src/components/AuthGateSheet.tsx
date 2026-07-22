@@ -3,23 +3,20 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   ActivityIndicator,
   Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../constants/theme';
 import { useThemedColors, useThemedShadows } from '../hooks/useThemedColors';
 import { useAuthStore } from '../store/authStore';
 import { AUTH_GATE_COPY, useAuthGateStore } from '../store/authGateStore';
 import { navigate } from '../lib/navigationRef';
+import InputFocusWrap from './InputFocusWrap';
 import LoginErrorModal from './LoginErrorModal';
+import KeyboardAwareSheet from './KeyboardAwareSheet';
 
 type AuthMode = 'login' | 'signup';
 type LoginErrorType = 'invalid_credentials' | 'empty_fields';
@@ -104,6 +101,8 @@ function createAuthGateStyles(p: ColorPalette, s: ShadowPalette) {
     },
     input: {
       flex: 1,
+      minWidth: 0,
+      alignSelf: 'stretch',
       color: p.textPrimary,
       fontFamily: Fonts.sans,
       fontSize: 14,
@@ -156,7 +155,6 @@ function createAuthGateStyles(p: ColorPalette, s: ShadowPalette) {
 }
 
 export default function AuthGateSheet() {
-  const insets = useSafeAreaInsets();
   const palette = useThemedColors();
   const shadow = useThemedShadows();
   const styles = useMemo(() => createAuthGateStyles(palette, shadow), [palette, shadow]);
@@ -303,156 +301,152 @@ export default function AuthGateSheet() {
 
   return (
     <>
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-        <KeyboardAvoidingView
-          style={styles.overlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleClose} />
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
-            <View style={styles.handle} />
+      <KeyboardAwareSheet
+        visible={visible}
+        onClose={handleClose}
+        sheetStyle={styles.sheet}
+        overlayStyle={styles.overlay}
+        bottomPadding={16}
+      >
+        <View style={styles.handle} />
 
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <View style={styles.headerRow}>
-                <View style={styles.headerText}>
-                  <Image
-                    source={require('../../assets/transparent_logo.png')}
-                    style={styles.logo}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.title}>{copy.title}</Text>
-                  <Text style={styles.subtitle}>{copy.subtitle}</Text>
-                </View>
-                <TouchableOpacity style={styles.closeBtn} onPress={handleClose} accessibilityLabel="Close">
-                  <Feather name="x" size={18} color={palette.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.modeToggle}>
-                <TouchableOpacity
-                  style={[styles.modeBtn, mode === 'login' && styles.modeBtnActive]}
-                  onPress={() => setMode('login')}
-                >
-                  <Text style={[styles.modeText, mode === 'login' && styles.modeTextActive]}>Sign in</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modeBtn, mode === 'signup' && styles.modeBtnActive]}
-                  onPress={() => setMode('signup')}
-                >
-                  <Text style={[styles.modeText, mode === 'signup' && styles.modeTextActive]}>Create account</Text>
-                </TouchableOpacity>
-              </View>
-
-              {mode === 'signup' && (
-                <View style={styles.field}>
-                  <Text style={styles.label}>Full name</Text>
-                  <View style={styles.inputWrap}>
-                    <Feather name="user" size={16} color={palette.textMuted} />
-                    <TextInput
-                      value={name}
-                      onChangeText={setName}
-                      placeholder="Your name"
-                      placeholderTextColor={palette.textMuted}
-                      style={styles.input}
-                    />
-                  </View>
-                </View>
-              )}
-
-              <View style={styles.field}>
-                <Text style={styles.label}>Email</Text>
-                <View style={styles.inputWrap}>
-                  <Feather name="mail" size={16} color={palette.textMuted} />
-                  <TextInput
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="you@email.com"
-                    placeholderTextColor={palette.textMuted}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    style={styles.input}
-                  />
-                </View>
-              </View>
-
-              {mode === 'signup' && (
-                <View style={styles.field}>
-                  <Text style={styles.label}>Phone</Text>
-                  <View style={styles.inputWrap}>
-                    <Feather name="phone" size={16} color={palette.textMuted} />
-                    <TextInput
-                      value={phone}
-                      onChangeText={setPhone}
-                      placeholder="+254..."
-                      placeholderTextColor={palette.textMuted}
-                      keyboardType="phone-pad"
-                      style={styles.input}
-                    />
-                  </View>
-                </View>
-              )}
-
-              <View style={styles.field}>
-                <Text style={styles.label}>Password</Text>
-                <View style={styles.inputWrap}>
-                  <Feather name="lock" size={16} color={palette.textMuted} />
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="********"
-                    placeholderTextColor={palette.textMuted}
-                    secureTextEntry={!showPassword}
-                    style={styles.input}
-                  />
-                  <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
-                    <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color={palette.textMuted} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {mode === 'login' ? (
-                <TouchableOpacity
-                  style={styles.forgotBtn}
-                  onPress={() => {
-                    handleClose();
-                    navigate('ForgotPassword');
-                  }}
-                >
-                  <Text style={styles.forgotText}>Forgot password?</Text>
-                </TouchableOpacity>
-              ) : null}
-
-              <TouchableOpacity
-                style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
-                onPress={() => void handleSubmit()}
-                disabled={loading}
-                activeOpacity={0.85}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color={palette.bg} />
-                ) : (
-                  <Text style={styles.primaryBtnText}>
-                    {mode === 'login' ? 'Sign in' : 'Create account'} - {copy.cta}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.secondaryBtn} onPress={handleClose}>
-                <Text style={styles.secondaryBtnText}>Not now - keep browsing</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.providerLink} onPress={openProviderLogin}>
-                <Feather name="briefcase" size={14} color={palette.gold} />
-                <Text style={styles.providerLinkText}>I'm a service provider</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.terms}>
-                By continuing you agree to NLBB Terms of Service and Privacy Policy.
-              </Text>
-            </ScrollView>
+        <View style={styles.headerRow}>
+          <View style={styles.headerText}>
+            <Image
+              source={require('../../assets/transparent_logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.title}>{copy.title}</Text>
+            <Text style={styles.subtitle}>{copy.subtitle}</Text>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+          <TouchableOpacity style={styles.closeBtn} onPress={handleClose} accessibilityLabel="Close">
+            <Feather name="x" size={18} color={palette.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.modeToggle}>
+          <TouchableOpacity
+            style={[styles.modeBtn, mode === 'login' && styles.modeBtnActive]}
+            onPress={() => setMode('login')}
+          >
+            <Text style={[styles.modeText, mode === 'login' && styles.modeTextActive]}>Sign in</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeBtn, mode === 'signup' && styles.modeBtnActive]}
+            onPress={() => setMode('signup')}
+          >
+            <Text style={[styles.modeText, mode === 'signup' && styles.modeTextActive]}>Create account</Text>
+          </TouchableOpacity>
+        </View>
+
+        {mode === 'signup' && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Full name</Text>
+            <InputFocusWrap style={styles.inputWrap}>
+              <Feather name="user" size={16} color={palette.textMuted} />
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="Your name"
+                placeholderTextColor={palette.textMuted}
+                style={styles.input}
+              />
+            </InputFocusWrap>
+          </View>
+        )}
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Email</Text>
+          <InputFocusWrap style={styles.inputWrap}>
+            <Feather name="mail" size={16} color={palette.textMuted} />
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@email.com"
+              placeholderTextColor={palette.textMuted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={styles.input}
+            />
+          </InputFocusWrap>
+        </View>
+
+        {mode === 'signup' && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Phone</Text>
+            <InputFocusWrap style={styles.inputWrap}>
+              <Feather name="phone" size={16} color={palette.textMuted} />
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+254..."
+                placeholderTextColor={palette.textMuted}
+                keyboardType="phone-pad"
+                style={styles.input}
+              />
+            </InputFocusWrap>
+          </View>
+        )}
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Password</Text>
+          <InputFocusWrap style={styles.inputWrap}>
+            <Feather name="lock" size={16} color={palette.textMuted} />
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="********"
+              placeholderTextColor={palette.textMuted}
+              secureTextEntry={!showPassword}
+              style={styles.input}
+            />
+            <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
+              <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color={palette.textMuted} />
+            </TouchableOpacity>
+          </InputFocusWrap>
+        </View>
+
+        {mode === 'login' ? (
+          <TouchableOpacity
+            style={styles.forgotBtn}
+            onPress={() => {
+              handleClose();
+              navigate('ForgotPassword');
+            }}
+          >
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        <TouchableOpacity
+          style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
+          onPress={() => void handleSubmit()}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={palette.bg} />
+          ) : (
+            <Text style={styles.primaryBtnText}>
+              {mode === 'login' ? 'Sign in' : 'Create account'} - {copy.cta}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.secondaryBtn} onPress={handleClose}>
+          <Text style={styles.secondaryBtnText}>Not now - keep browsing</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.providerLink} onPress={openProviderLogin}>
+          <Feather name="briefcase" size={14} color={palette.gold} />
+          <Text style={styles.providerLinkText}>I'm a service provider</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.terms}>
+          By continuing you agree to NLBB Terms of Service and Privacy Policy.
+        </Text>
+      </KeyboardAwareSheet>
 
       <LoginErrorModal
         visible={errorVisible}

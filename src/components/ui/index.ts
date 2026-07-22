@@ -5,3 +5,5 @@ export { default as NLBBTabBar } from './NLBBTabBar';
 export type { NLBBTabConfig } from './NLBBTabBar';
 export { default as AuthScreenLayout } from './AuthScreenLayout';
 export { default as NLBBSkeleton } from './NLBBSkeleton';
+export { default as KeyboardAwareScrollView } from '../KeyboardAwareScrollView';
+export { default as KeyboardAwareSheet, useScrollFieldIntoView } from '../KeyboardAwareSheet';

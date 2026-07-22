@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { TextInput, TouchableOpacity, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../constants/theme';
 import { useThemedColors, useThemedShadows } from '../hooks/useThemedColors';
+import InputFocusWrap from './InputFocusWrap';
 
 interface SearchBarProps {
   value: string;
@@ -27,6 +28,8 @@ function createSearchBarStyles(p: ColorPalette, s: ShadowPalette) {
     },
     input: {
       flex: 1,
+      minWidth: 0,
+      alignSelf: 'stretch',
       color: p.textPrimary,
       fontFamily: Fonts.sansMedium,
       fontSize: 14,
@@ -66,7 +69,7 @@ export default function SearchBar({
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <View style={[styles.container, isFocused && { borderColor: palette.gold }]}>
+    <InputFocusWrap style={[styles.container, isFocused && { borderColor: palette.gold }]}>
       <Feather name="search" size={18} color={isFocused ? palette.gold : palette.textMuted} />
       <TextInput
         value={value}
@@ -83,6 +86,6 @@ export default function SearchBar({
           {filterActive && <View style={styles.filterDot} />}
         </TouchableOpacity>
       )}
-    </View>
+    </InputFocusWrap>
   );
 }

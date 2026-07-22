@@ -4,17 +4,16 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   TextInput,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
+import KeyboardAwareScrollView from '../../components/KeyboardAwareScrollView';
 import { Colors, Fonts, Radius } from '../../constants/theme';
 import { DEFAULT_SERVICE_CATEGORY_NAMES } from '../../constants/serviceCategories';
 import GoldButton from '../../components/GoldButton';
+import InputFocusWrap from '../../components/InputFocusWrap';
 import ProviderLocationPicker, { PickedProviderLocation } from '../../components/ProviderLocationPicker';
 import { useModalManager } from '../../hooks/useModalManager';
 import { useAuthStore } from '../../store/authStore';
@@ -110,11 +109,10 @@ export default function ProviderSignupScreen({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 32 }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+    <View style={styles.container}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16 }]}
+        bottomPadding={32}
       >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Feather name="arrow-left" size={20} color={Colors.textPrimary} />
@@ -144,18 +142,18 @@ export default function ProviderSignupScreen({ navigation }: any) {
           <View style={styles.form}>
             <View style={styles.field}>
               <Text style={styles.label}>Business Name</Text>
-              <View style={styles.inputWrap}>
+              <InputFocusWrap style={styles.inputWrap}>
                 <Feather name="briefcase" size={16} color={Colors.textSecondary} />
                 <TextInput value={businessName} onChangeText={setBusinessName} placeholder="e.g. Luxe Glow Studio" placeholderTextColor={Colors.textSecondary} style={styles.input} />
-              </View>
+              </InputFocusWrap>
             </View>
 
             <View style={styles.field}>
               <Text style={styles.label}>Owner / Contact Name</Text>
-              <View style={styles.inputWrap}>
+              <InputFocusWrap style={styles.inputWrap}>
                 <Feather name="user" size={16} color={Colors.textSecondary} />
                 <TextInput value={ownerName} onChangeText={setOwnerName} placeholder="Your full name" placeholderTextColor={Colors.textSecondary} style={styles.input} />
-              </View>
+              </InputFocusWrap>
             </View>
 
             <View style={styles.field}>
@@ -186,26 +184,26 @@ export default function ProviderSignupScreen({ navigation }: any) {
           <View style={styles.form}>
             <View style={styles.field}>
               <Text style={styles.label}>Business Phone (M-Pesa)</Text>
-              <View style={styles.inputWrap}>
+              <InputFocusWrap style={styles.inputWrap}>
                 <Feather name="phone" size={16} color={Colors.textSecondary} />
                 <TextInput value={phone} onChangeText={setPhone} placeholder="+254 7XX XXX XXX" placeholderTextColor={Colors.textSecondary} keyboardType="phone-pad" style={styles.input} />
-              </View>
+              </InputFocusWrap>
             </View>
 
             <View style={styles.field}>
               <Text style={styles.label}>Email</Text>
-              <View style={styles.inputWrap}>
+              <InputFocusWrap style={styles.inputWrap}>
                 <Feather name="mail" size={16} color={Colors.textSecondary} />
                 <TextInput value={email} onChangeText={setEmail} placeholder="business@email.com" placeholderTextColor={Colors.textSecondary} keyboardType="email-address" autoCapitalize="none" style={styles.input} />
-              </View>
+              </InputFocusWrap>
             </View>
 
             <View style={styles.field}>
               <Text style={styles.label}>Password</Text>
-              <View style={styles.inputWrap}>
+              <InputFocusWrap style={styles.inputWrap}>
                 <Feather name="lock" size={16} color={Colors.textSecondary} />
                 <TextInput value={password} onChangeText={setPassword} placeholder="Min. 8 characters" placeholderTextColor={Colors.textSecondary} secureTextEntry style={styles.input} />
-              </View>
+              </InputFocusWrap>
             </View>
 
             <View style={styles.subNotice}>
@@ -229,8 +227,8 @@ export default function ProviderSignupScreen({ navigation }: any) {
           </TouchableOpacity>
         )}
         <FeedbackModalHost modal={modal} onDismiss={hideModal} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
+    </View>
   );
 }
 
@@ -279,7 +277,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  input: { flex: 1, color: Colors.textPrimary, fontFamily: Fonts.sans, fontSize: 14, padding: 0 },
+  input: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
+    color: Colors.textPrimary,
+    fontFamily: Fonts.sans,
+    fontSize: 14,
+    padding: 0,
+  },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   categoryChip: {
     paddingHorizontal: 14,

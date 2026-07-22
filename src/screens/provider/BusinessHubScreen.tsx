@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ProviderNotifButton from '../../components/ProviderNotifButton';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 
@@ -16,7 +17,15 @@ type HubAction = {
 function createHubStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: p.bg },
-    header: { paddingHorizontal: 24, paddingVertical: 16 },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingHorizontal: 24,
+      paddingVertical: 16,
+    },
+    headerText: { flex: 1, paddingRight: 8 },
     heading: { fontFamily: Fonts.serifMedium, fontSize: 26, color: p.textPrimary, marginBottom: 6 },
     subheading: {
       fontFamily: Fonts.sans,
@@ -102,8 +111,11 @@ export default function BusinessHubScreen({ navigation }: any) {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.heading}>Services</Text>
-        <Text style={styles.subheading}>Run your shop — services, plan, and growth tools.</Text>
+        <View style={styles.headerText}>
+          <Text style={styles.heading}>Services</Text>
+          <Text style={styles.subheading}>Run your shop — services, plan, and growth tools.</Text>
+        </View>
+        <ProviderNotifButton />
       </View>
 
       <ScrollView

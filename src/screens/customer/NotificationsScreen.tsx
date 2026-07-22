@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
+import { navigateFromNotificationPayload } from '../../lib/notificationNavigation';
 import { Notification } from '../../types';
 import { useAppStore } from '../../store/appStore';
 import EmptyState from '../../components/EmptyState';
@@ -75,33 +76,21 @@ export default function NotificationsScreen({ navigation }: any) {
   const palette = useThemedColors();
   const shadow = useThemedShadows();
   const styles = useMemo(() => createNotificationsStyles(palette, shadow), [palette, shadow]);
-  const {
-    customerNotifications,
-    markCustomerNotificationRead,
-    markAllCustomerNotificationsRead,
-    hydrateCustomerNotifications,
-  } = useAppStore();
+  const customerNotifications = useAppStore((s) => s.customerNotifications);
+  const markCustomerNotificationRead = useAppStore((s) => s.markCustomerNotificationRead);
+  const markAllCustomerNotificationsRead = useAppStore((s) => s.markAllCustomerNotificationsRead);
+  const hydrateCustomerNotifications = useAppStore((s) => s.hydrateCustomerNotifications);
   const unreadCount = customerNotifications.filter((n) => !n.isRead).length;
 
   useFocusEffect(
     useCallback(() => {
-      void hydrateCustomerNotifications();
+      void hydrateCustomerNotifications({ force: true });
     }, [hydrateCustomerNotifications])
   );
 
   const handleNotificationPress = async (notification: Notification) => {
     await markCustomerNotificationRead(notification.id);
-
-    switch (notification.actionType) {
-      case 'customer_bookings':
-        navigation.navigate('CustomerApp', {
-          screen: 'Bookings',
-          params: notification.actionId ? { bookingId: notification.actionId } : undefined,
-        });
-        break;
-      default:
-        break;
-    }
+    navigateFromNotificationPayload(notification, { role: 'customer' });
   };
 
   return (

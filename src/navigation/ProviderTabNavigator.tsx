@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NLBBTabBar, NLBBTabConfig } from '../components/ui';
@@ -39,18 +39,30 @@ const PROVIDER_TABS: NLBBTabConfig[] = [
 ];
 
 export default function ProviderTabNavigator() {
+  const [activeTab, setActiveTab] = useState('Dashboard');
+  const showAddServiceFab = activeTab !== 'ProviderProfile';
+
   return (
     <View style={styles.root}>
       <Tab.Navigator
         tabBar={(props) => <NLBBTabBar {...props} tabs={PROVIDER_TABS} />}
         screenOptions={{ headerShown: false }}
+        screenListeners={{
+          state: (event) => {
+            const nextState = event.data.state;
+            const route = nextState?.routes?.[nextState.index ?? 0];
+            if (route?.name) {
+              setActiveTab(route.name);
+            }
+          },
+        }}
       >
         <Tab.Screen name="Dashboard" component={ProviderDashboardScreen} />
         <Tab.Screen name="Appointments" component={ProviderAppointmentsScreen} />
         <Tab.Screen name="Business" component={BusinessStackNavigator} />
         <Tab.Screen name="ProviderProfile" component={ProviderProfileScreen} />
       </Tab.Navigator>
-      <ProviderAddFab />
+      {showAddServiceFab ? <ProviderAddFab /> : null}
     </View>
   );
 }
