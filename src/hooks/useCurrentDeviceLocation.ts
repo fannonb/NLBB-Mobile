@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
 import { Coordinates } from '../lib/location/providerDistance';
 
@@ -9,85 +10,113 @@ export type DeviceLocationState = {
   status: DeviceLocationStatus;
 };
 
-export function useCurrentDeviceLocationState(): DeviceLocationState {
-  const [state, setState] = useState<DeviceLocationState>({
-    coordinates: null,
-    status: 'loading',
-  });
+let sharedState: DeviceLocationState = {
+  coordinates: null,
+  status: 'loading',
+};
 
-  useEffect(() => {
-    let active = true;
+const listeners = new Set<(state: DeviceLocationState) => void>();
+let inFlightLoad: Promise<void> | null = null;
 
-    const loadLocation = async () => {
-      try {
-        const servicesEnabled = await Location.hasServicesEnabledAsync();
-        if (!active) {
-          return;
-        }
-        if (!servicesEnabled) {
-          setState({ coordinates: null, status: 'unavailable' });
-          return;
-        }
+const emitState = (next: DeviceLocationState) => {
+  sharedState = next;
+  listeners.forEach((listener) => listener(next));
+};
 
-        const existing = await Location.getForegroundPermissionsAsync();
-        const permission =
-          existing.status === 'granted'
-            ? existing
-            : existing.canAskAgain
-              ? await Location.requestForegroundPermissionsAsync()
-              : existing;
+const loadSharedLocation = async (force = false) => {
+  if (inFlightLoad && !force) {
+    return inFlightLoad;
+  }
 
-        if (!active || permission.status !== 'granted') {
-          if (active) {
-            setState({ coordinates: null, status: 'permission-denied' });
-          }
-          return;
-        }
+  const request = (async () => {
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        emitState({ coordinates: sharedState.coordinates, status: 'unavailable' });
+        return;
+      }
 
-        const lastKnown = await Location.getLastKnownPositionAsync({
-          maxAge: 5 * 60 * 1000,
-          requiredAccuracy: 1000,
+      const existing = await Location.getForegroundPermissionsAsync();
+      const permission =
+        existing.status === 'granted'
+          ? existing
+          : existing.canAskAgain
+            ? await Location.requestForegroundPermissionsAsync()
+            : existing;
+
+      if (permission.status !== 'granted') {
+        emitState({
+          coordinates: sharedState.coordinates,
+          status: sharedState.coordinates ? 'available' : 'permission-denied',
         });
+        return;
+      }
 
-        if (active && lastKnown) {
-          setState({
-            coordinates: {
-              lat: lastKnown.coords.latitude,
-              lng: lastKnown.coords.longitude,
-            },
-            status: 'available',
-          });
-        }
+      const lastKnown = await Location.getLastKnownPositionAsync({
+        maxAge: 5 * 60 * 1000,
+        requiredAccuracy: 1000,
+      });
 
-        const current = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-
-        if (!active) {
-          return;
-        }
-
-        setState({
+      if (lastKnown) {
+        emitState({
           coordinates: {
-            lat: current.coords.latitude,
-            lng: current.coords.longitude,
+            lat: lastKnown.coords.latitude,
+            lng: lastKnown.coords.longitude,
           },
           status: 'available',
         });
-      } catch {
-        if (active) {
-          setState((previous) => ({
-            coordinates: previous.coordinates,
-            status: previous.coordinates ? 'available' : 'unavailable',
-          }));
-        }
+      } else if (sharedState.status === 'loading') {
+        emitState({
+          coordinates: sharedState.coordinates,
+          status: sharedState.coordinates ? 'available' : 'unavailable',
+        });
+      }
+
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      emitState({
+        coordinates: {
+          lat: current.coords.latitude,
+          lng: current.coords.longitude,
+        },
+        status: 'available',
+      });
+    } catch {
+      emitState({
+        coordinates: sharedState.coordinates,
+        status: sharedState.coordinates ? 'available' : 'unavailable',
+      });
+    }
+  })().finally(() => {
+    if (inFlightLoad === request) {
+      inFlightLoad = null;
+    }
+  });
+
+  inFlightLoad = request;
+  return request;
+};
+
+export function useCurrentDeviceLocationState(): DeviceLocationState {
+  const [state, setState] = useState<DeviceLocationState>(sharedState);
+
+  useEffect(() => {
+    listeners.add(setState);
+    void loadSharedLocation();
+
+    const onAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        void loadSharedLocation(true);
       }
     };
 
-    void loadLocation();
+    const subscription = AppState.addEventListener('change', onAppStateChange);
 
     return () => {
-      active = false;
+      listeners.delete(setState);
+      subscription.remove();
     };
   }, []);
 

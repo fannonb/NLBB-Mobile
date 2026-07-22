@@ -63,6 +63,8 @@ jobs:
           cat <<'EOF' > google-services.json
           ${{ secrets.GOOGLE_SERVICES_JSON }}
           EOF
+          mkdir -p android/app
+          cp google-services.json android/app/google-services.json
 
       - name: Typecheck mobile app
         run: npm run typecheck
