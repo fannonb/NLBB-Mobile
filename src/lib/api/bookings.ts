@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import { Booking, BookingStatus } from '../../types';
+import { normalizeBookingImageRecord } from '../media';
 
 export type BookingBackendStatus = 'pending' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
 export type CustomerBookingStatus = BookingStatus;
@@ -258,49 +259,55 @@ export const formatBookingTime = (value: string) => {
 
 export const formatDuration = (minutes: number) => `${minutes}m`;
 
-export const toCustomerBookingCard = (booking: BookingRecord): CustomerBookingCard => ({
-  id: booking.id,
-  ref: booking.ref,
-  customerId: booking.customerId,
-  providerId: booking.providerId,
-  providerName: booking.providerName,
-  providerImage: booking.providerImage ?? undefined,
-  providerPhone: booking.providerPhone ?? undefined,
-  providerWhatsapp: booking.providerWhatsapp ?? undefined,
-  serviceName: booking.serviceName,
-  servicePrice: booking.servicePrice,
-  scheduledAt: booking.scheduledAt,
-  endAt: booking.endAt,
-  duration: booking.duration,
-  status: CUSTOMER_STATUS_MAP[booking.status],
-  notes: booking.notes ?? undefined,
-  totalAmount: booking.totalAmount,
-  platformFee: booking.platformFee,
-  reviewId: booking.reviewId ?? null,
-  date: formatBookingDate(booking.scheduledAt),
-  time: formatBookingTime(booking.scheduledAt),
-  endTime: formatBookingTime(booking.endAt),
-});
+export const toCustomerBookingCard = (booking: BookingRecord): CustomerBookingCard => {
+  const normalized = normalizeBookingImageRecord(booking);
+  return {
+    id: normalized.id,
+    ref: normalized.ref,
+    customerId: normalized.customerId,
+    providerId: normalized.providerId,
+    providerName: normalized.providerName,
+    providerImage: normalized.providerImage ?? undefined,
+    providerPhone: normalized.providerPhone ?? undefined,
+    providerWhatsapp: normalized.providerWhatsapp ?? undefined,
+    serviceName: normalized.serviceName,
+    servicePrice: normalized.servicePrice,
+    scheduledAt: normalized.scheduledAt,
+    endAt: normalized.endAt,
+    duration: normalized.duration,
+    status: CUSTOMER_STATUS_MAP[normalized.status],
+    notes: normalized.notes ?? undefined,
+    totalAmount: normalized.totalAmount,
+    platformFee: normalized.platformFee,
+    reviewId: normalized.reviewId ?? null,
+    date: formatBookingDate(normalized.scheduledAt),
+    time: formatBookingTime(normalized.scheduledAt),
+    endTime: formatBookingTime(normalized.endAt),
+  };
+};
 
-export const toProviderAppointmentCard = (booking: BookingRecord): ProviderAppointmentCard => ({
-  id: booking.id,
-  ref: booking.ref,
-  status: PROVIDER_STATUS_MAP[booking.status],
-  customerName: booking.customerName ?? 'Customer',
-  customerImg: booking.customerAvatar ?? null,
-  customerPhone: booking.customerPhone ?? '',
-  isNewClient: false,
-  service: booking.serviceName,
-  price: booking.servicePrice,
-  scheduledAt: booking.scheduledAt,
-  endAt: booking.endAt,
-  date: formatBookingDate(booking.scheduledAt),
-  time: formatBookingTime(booking.scheduledAt),
-  duration: formatDuration(booking.duration),
-  notes: booking.notes ?? undefined,
-  ago: formatRelative(booking.createdAt),
-  providerId: booking.providerId,
-});
+export const toProviderAppointmentCard = (booking: BookingRecord): ProviderAppointmentCard => {
+  const normalized = normalizeBookingImageRecord(booking);
+  return {
+    id: normalized.id,
+    ref: normalized.ref,
+    status: PROVIDER_STATUS_MAP[normalized.status],
+    customerName: normalized.customerName ?? 'Customer',
+    customerImg: normalized.customerAvatar ?? null,
+    customerPhone: normalized.customerPhone ?? '',
+    isNewClient: false,
+    service: normalized.serviceName,
+    price: normalized.servicePrice,
+    scheduledAt: normalized.scheduledAt,
+    endAt: normalized.endAt,
+    date: formatBookingDate(normalized.scheduledAt),
+    time: formatBookingTime(normalized.scheduledAt),
+    duration: formatDuration(normalized.duration),
+    notes: normalized.notes ?? undefined,
+    ago: formatRelative(normalized.createdAt),
+    providerId: normalized.providerId,
+  };
+};
 
 export const mapBookingStatusToBackend = (
   status: UpdateBookingStatusPayload['status']

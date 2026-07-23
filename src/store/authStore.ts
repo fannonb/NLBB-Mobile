@@ -24,6 +24,7 @@ import { resetDemoState } from '../lib/demo/demoState';
 import { registerForPushNotificationsAsync } from '../lib/push';
 import { useAppStore } from './appStore';
 import { useBookingDataStore } from './bookingDataStore';
+import { resolveImageUrl } from '../lib/config';
 
 interface AuthState {
   user: User | null;
@@ -73,9 +74,14 @@ const mapBackendUserToAppUser = (profile: BackendUserProfile): User => ({
   name: profile.name,
   email: profile.email ?? '',
   phone: profile.phone,
-  avatar: profile.avatar ?? undefined,
+  avatar: resolveImageUrl(profile.avatar) || undefined,
   role: profile.role,
   location: profile.location ?? undefined,
+});
+
+const normalizeStoredUser = (user: User): User => ({
+  ...user,
+  avatar: resolveImageUrl(user.avatar) || undefined,
 });
 
 let initialized = false;
@@ -200,14 +206,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         set({
-          user: cachedUser,
+          user: cachedUser ? normalizeStoredUser(cachedUser) : null,
           isLoggedIn: cachedUser !== null,
           isReady: true,
           isInitializing: false,
         });
         if (cachedUser) {
           lastUserRefreshAt = Date.now();
-          warmSignedInAppState(cachedUser);
+          warmSignedInAppState(normalizeStoredUser(cachedUser));
         }
 
         void (async () => {

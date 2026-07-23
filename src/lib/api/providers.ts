@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 import { Category, Provider, Review } from '../../types';
 import { formatReadableDateTime } from '../dateTime';
+import { normalizeProviderMedia, normalizeReviewMedia } from '../media';
 
 export interface ProviderListFilters {
   search?: string;
@@ -45,8 +46,9 @@ const listProvidersCached = (filters: ProviderListFilters = {}) => {
 
   const request = apiClient.get<Provider[]>(path)
     .then((data) => {
-      providerCache.set(path, { data, loadedAt: Date.now() });
-      return data;
+      const normalized = data.map(normalizeProviderMedia);
+      providerCache.set(path, { data: normalized, loadedAt: Date.now() });
+      return normalized;
     })
     .finally(() => {
       if (providerRequests.get(path) === request) {
@@ -79,7 +81,8 @@ const listCategoriesCached = (options: { force?: boolean } = {}) => {
 
 export const providerApi = {
   listProviders: listProvidersCached,
-  getProvider: (providerId: string) => apiClient.get<Provider>(`providers/${providerId}`),
+  getProvider: (providerId: string) =>
+    apiClient.get<Provider>(`providers/${providerId}`).then(normalizeProviderMedia),
   listCategories: listCategoriesCached,
   listReviews: async (providerId: string) => {
     const reviews = await apiClient.get<Array<{
@@ -94,15 +97,17 @@ export const providerApi = {
       updatedAt?: string;
     }>>(`providers/${providerId}/reviews`);
 
-    return reviews.map((review) => ({
-      id: review.id,
-      userId: review.customerId ?? review.id,
-      userName: review.userName,
-      userAvatar: review.userAvatar,
-      serviceName: review.serviceName,
-      rating: review.rating,
-      comment: review.comment,
-      date: formatReadableDateTime(review.createdAt ?? review.updatedAt, 'Recently'),
-    })) as Review[];
+    return reviews.map((review) =>
+      normalizeReviewMedia({
+        id: review.id,
+        userId: review.customerId ?? review.id,
+        userName: review.userName,
+        userAvatar: review.userAvatar,
+        serviceName: review.serviceName,
+        rating: review.rating,
+        comment: review.comment,
+        date: formatReadableDateTime(review.createdAt ?? review.updatedAt, 'Recently'),
+      })
+    ) as Review[];
   },
 };

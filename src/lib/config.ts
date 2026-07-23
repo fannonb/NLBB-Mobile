@@ -94,10 +94,33 @@ export const API_BASE_URL = API_BASE_URLS[0] ?? 'http://localhost:4000/api';
 
 console.log('[config] API_BASE_URLS', API_BASE_URLS);
 
+const getApiOrigin = () => {
+  const preferredBaseUrl = API_BASE_URLS[0] ?? API_BASE_URL;
+  try {
+    return new URL(preferredBaseUrl).origin;
+  } catch {
+    return null;
+  }
+};
+
 export const resolveImageUrl = (value: string | null | undefined, fallback?: string): string => {
   const trimmed = value?.trim();
   if (!trimmed) {
     return fallback ?? '';
+  }
+
+  if (/^(?:data:|file:|content:)/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed}`;
+  }
+
+  const apiOrigin = getApiOrigin();
+  if (apiOrigin && (trimmed.startsWith('/') || trimmed.startsWith('uploads/'))) {
+    const normalizedPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return `${apiOrigin}${normalizedPath}`;
   }
 
   if (Platform.OS === 'android') {

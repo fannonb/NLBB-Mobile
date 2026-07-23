@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { normalizeAvatarRecord } from '../media';
 
 export type AdminProviderStatus = 'pending' | 'approved' | 'suspended';
 export type AdminProviderSubscriptionStatus = 'active' | 'expired' | 'none';
@@ -112,15 +113,23 @@ const toQueryString = (query: AdminListQuery) => {
 };
 
 export const adminApi = {
-  getDashboard: () => apiClient.get<AdminDashboardData>('admin/dashboard'),
+  getDashboard: () =>
+    apiClient.get<AdminDashboardData>('admin/dashboard').then((data) => ({
+      ...data,
+      pendingProviders: data.pendingProviders.map(normalizeAvatarRecord),
+    })),
   listProviders: (query: AdminListQuery = {}) =>
-    apiClient.get<AdminProviderRecord[]>(`admin/providers${toQueryString(query)}`),
+    apiClient
+      .get<AdminProviderRecord[]>(`admin/providers${toQueryString(query)}`)
+      .then((records) => records.map(normalizeAvatarRecord)),
   updateProviderStatus: (providerId: string, status: AdminProviderStatus) =>
     apiClient.patch<AdminProviderRecord>(`admin/providers/${providerId}/status`, { status }),
   deleteProvider: (providerId: string) =>
     apiClient.delete<{ id: string; deleted: boolean }>(`admin/providers/${providerId}`),
   listUsers: (query: AdminListQuery = {}) =>
-    apiClient.get<AdminUserRecord[]>(`admin/users${toQueryString(query)}`),
+    apiClient
+      .get<AdminUserRecord[]>(`admin/users${toQueryString(query)}`)
+      .then((records) => records.map(normalizeAvatarRecord)),
   updateUserStatus: (userId: string, status: AdminUserStatus) =>
     apiClient.patch<AdminUserRecord>(`admin/users/${userId}/status`, { status }),
   deleteUser: (userId: string) => apiClient.delete<{ id: string; deleted: boolean }>(`admin/users/${userId}`),

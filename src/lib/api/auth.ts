@@ -3,6 +3,7 @@ import { API_BASE_URLS } from '../config';
 import { UserRole } from '../../types';
 import { createApiClientError } from './client';
 import { fetchWithApiBaseUrlFallback } from './baseUrl';
+import { normalizeAvatarRecord } from '../media';
 
 export interface BackendUserProfile {
   id: string;
@@ -153,10 +154,13 @@ export const authApi = {
   changePassword: (payload: { currentPassword: string; newPassword: string }) =>
     apiClient.post<{ updated: boolean }>('auth/change-password', payload),
   uploadAvatar: (payload: { dataUri: string }) =>
-    apiClient.post<BackendUserProfile>('auth/avatar', payload),
-  getMe: () => apiClient.get<BackendUserProfile | null>('auth/me'),
+    apiClient.post<BackendUserProfile>('auth/avatar', payload).then(normalizeAvatarRecord),
+  getMe: () =>
+    apiClient
+      .get<BackendUserProfile | null>('auth/me')
+      .then((profile) => (profile ? normalizeAvatarRecord(profile) : null)),
   upsertProfile: (payload: UpsertProfileInput) =>
-    apiClient.post<BackendUserProfile>('auth/profile', payload),
+    apiClient.post<BackendUserProfile>('auth/profile', payload).then(normalizeAvatarRecord),
   registerPushToken: (payload: { platform: 'ios' | 'android'; token: string }) =>
     apiClient.post<{ registered: boolean }>('auth/push-token', payload),
   /** Request a password-reset email. Safe to call even if email is not registered. */

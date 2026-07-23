@@ -1,5 +1,7 @@
 import { apiClient } from './client';
 import { Provider, Service } from '../../types';
+import { normalizeProviderMedia } from '../media';
+import { resolveImageUrl } from '../config';
 
 export type ProviderService = Service & { isActive: boolean };
 
@@ -87,8 +89,9 @@ export const providerManagementApi = {
     }
 
     const request = apiClient.get<Provider>('providers/me/profile').then((provider) => {
-      profileCache = { data: provider, loadedAt: Date.now() };
-      return provider;
+      const normalized = normalizeProviderMedia(provider);
+      profileCache = { data: normalized, loadedAt: Date.now() };
+      return normalized;
     }).finally(() => {
       if (profileRequest === request) {
         profileRequest = null;
@@ -98,23 +101,27 @@ export const providerManagementApi = {
     return request;
   },
   saveMyProfile: async (payload: ProviderProfilePayload) => {
-    const provider = await apiClient.post<Provider>('providers/me/profile', payload);
+    const provider = normalizeProviderMedia(await apiClient.post<Provider>('providers/me/profile', payload));
     profileCache = { data: provider, loadedAt: Date.now() };
     return provider;
   },
   saveMyRegistrationDetails: async (payload: ProviderRegistrationDetailsPayload) => {
-    const provider = await apiClient.post<Provider>('providers/me/registration-details', payload);
+    const provider = normalizeProviderMedia(
+      await apiClient.post<Provider>('providers/me/registration-details', payload)
+    );
     profileCache = { data: provider, loadedAt: Date.now() };
     return provider;
   },
   setMyOpenState: async (isOpen: boolean) => {
-    const provider = await apiClient.patch<Provider>('providers/me/open-state', { isOpen });
+    const provider = normalizeProviderMedia(
+      await apiClient.patch<Provider>('providers/me/open-state', { isOpen })
+    );
     profileCache = { data: provider, loadedAt: Date.now() };
     return provider;
   },
   uploadMyMedia: async (payload: ProviderMediaUploadPayload) => {
     const uploaded = await apiClient.post<{ url: string }>('providers/me/media', payload);
-    return uploaded.url;
+    return resolveImageUrl(uploaded.url);
   },
   listMyServices: async (options: { force?: boolean } = {}) => {
     if (!options.force && servicesCache && Date.now() - servicesCache.loadedAt < SERVICES_CACHE_MS) {
