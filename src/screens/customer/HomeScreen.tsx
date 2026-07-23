@@ -11,9 +11,9 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette, Spacing } from '../../constants/theme';
-import { mergeCategoriesWithDefaults } from '../../constants/serviceCategories';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { useCurrentDeviceLocation } from '../../hooks/useCurrentDeviceLocation';
+import { useProviderDirectory } from '../../hooks/useProviderDirectory';
 import SearchBar from '../../components/SearchBar';
 import CategoryTile from '../../components/CategoryTile';
 import ProviderCard from '../../components/ProviderCard';
@@ -28,7 +28,6 @@ import { withProviderDistances } from '../../lib/location/providerDistance';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useBookingDataStore } from '../../store/bookingDataStore';
-import { Category, Provider } from '../../types';
 
 const SCREEN_W = Dimensions.get('window').width;
 // Width of each tile in a 3-column grid (24px padding each side, 10px gap × 2)
@@ -332,39 +331,37 @@ export default function HomeScreen({ navigation }: any) {
     customerNotifications,
     hydrateCustomerNotifications,
   } = useAppStore();
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [favoritesLoading, setFavoritesLoading] = useState(isLoggedIn);
+  const {
+    providers,
+    categories,
+    loading,
+  } = useProviderDirectory();
   const bookingRecords = useBookingDataStore((state) => state.records);
   const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
 
   useEffect(() => {
     let active = true;
-    const load = async () => {
-      try {
-        const [provs, cats] = await Promise.all([
-          providerApi.listProviders(),
-          providerApi.listCategories(),
-        ]);
-        if (!active) return;
-        setProviders(provs);
-        setCategories(mergeCategoriesWithDefaults(cats));
-      } catch {
-        if (active) { setProviders([]); setCategories(mergeCategoriesWithDefaults([])); }
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    load();
-    return () => { active = false; };
-  }, []);
+    if (!isLoggedIn) {
+      setFavoritesLoading(false);
+      return () => {
+        active = false;
+      };
+    }
 
-  useEffect(() => {
-    hydrateFavorites();
+    setFavoritesLoading(true);
+    hydrateFavorites().finally(() => {
+      if (active) {
+        setFavoritesLoading(false);
+      }
+    });
     hydrateCustomerNotifications();
-  }, [hydrateFavorites, hydrateCustomerNotifications]);
+    return () => {
+      active = false;
+    };
+  }, [hydrateFavorites, hydrateCustomerNotifications, isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -406,6 +403,8 @@ export default function HomeScreen({ navigation }: any) {
   }, [rankedProviders, search, activeCategory]);
 
   const favoriteProviders = rankedProviders.filter((p) => favorites.includes(p.id));
+  const favoriteProvidersLoading =
+    isLoggedIn && (favoritesLoading || (loading && favorites.length > 0));
   const firstName = user?.name?.split(' ')[0] ?? 'there';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -623,7 +622,11 @@ export default function HomeScreen({ navigation }: any) {
             onSeeAll={isLoggedIn ? () => navigation.navigate('Favorites') : undefined}
           />
 
-          {favoriteProviders.length === 0 ? (
+          {favoriteProvidersLoading ? (
+            <View style={styles.favEmpty}>
+              <Text style={styles.favEmptyText}>Loading your favourites...</Text>
+            </View>
+          ) : favoriteProviders.length === 0 ? (
             isLoggedIn ? (
               <View style={styles.favEmpty}>
                 <Text style={styles.favEmptyText}>

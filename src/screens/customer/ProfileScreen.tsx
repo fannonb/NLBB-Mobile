@@ -13,10 +13,9 @@ import ActionSheetModal, { ActionSheetOption } from '../../components/ActionShee
 import FeedbackModalHost from '../../components/FeedbackModalHost';
 import { useModalManager } from '../../hooks/useModalManager';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { useProviderDirectory } from '../../hooks/useProviderDirectory';
 import { useAuthGateStore } from '../../store/authGateStore';
 import { toCustomerBookingCard } from '../../lib/api/bookings';
-import { providerApi } from '../../lib/api/providers';
-import { Provider } from '../../types';
 import { authApi } from '../../lib/api/auth';
 import { isApiClientError } from '../../lib/api/client';
 import { useBookingDataStore } from '../../store/bookingDataStore';
@@ -232,12 +231,13 @@ export default function ProfileScreen({ navigation }: any) {
   const { logout, user, refreshCurrentUser } = useAuthStore();
   const { isLoggedIn, requireAuth } = useRequireAuth();
   const openAuthGate = useAuthGateStore((state) => state.open);
-  const { customerNotifications, favorites, hydrateCustomerNotifications } = useAppStore();
+  const { customerNotifications, favorites, hydrateFavorites, hydrateCustomerNotifications } = useAppStore();
   const { modal, showActionSheet, showInfo, showError, showSuccess, hideModal } = useModalManager();
   const unreadCount = isLoggedIn ? customerNotifications.filter((notification) => !notification.isRead).length : 0;
   const bookingRecords = useBookingDataStore((state) => state.records);
   const loadMyBookings = useBookingDataStore((state) => state.loadMyBookings);
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const { providers, loading: providersLoading } = useProviderDirectory();
+  const [favoritesLoading, setFavoritesLoading] = useState(isLoggedIn);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const recentBooking = useMemo(
     () => (isLoggedIn && bookingRecords[0] ? toCustomerBookingCard(bookingRecords[0]) : null),
@@ -248,6 +248,7 @@ export default function ProfileScreen({ navigation }: any) {
     () => providers.filter((provider) => favorites.includes(provider.id)).slice(0, 2),
     [favorites, providers]
   );
+  const favoritesPending = isLoggedIn && (favoritesLoading || (providersLoading && favorites.length > 0));
 
   const userMeta = [user?.email, user?.phone].filter(Boolean).join(' | ');
   const avatarInitial = (user?.name?.trim()?.charAt(0) ?? 'U').toUpperCase();
@@ -343,8 +344,27 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   useEffect(() => {
+    let active = true;
     hydrateCustomerNotifications();
-  }, [hydrateCustomerNotifications]);
+
+    if (!isLoggedIn) {
+      setFavoritesLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setFavoritesLoading(true);
+    hydrateFavorites().finally(() => {
+      if (active) {
+        setFavoritesLoading(false);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [hydrateCustomerNotifications, hydrateFavorites, isLoggedIn]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -354,30 +374,6 @@ export default function ProfileScreen({ navigation }: any) {
       }
     }, [refreshCurrentUser, isLoggedIn, loadMyBookings])
   );
-
-  useEffect(() => {
-    let active = true;
-
-    const loadProviders = async () => {
-      try {
-        const result = await providerApi.listProviders();
-        if (!active) {
-          return;
-        }
-        setProviders(result);
-      } catch {
-        if (active) {
-          setProviders([]);
-        }
-      }
-    };
-
-    loadProviders();
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -460,7 +456,13 @@ export default function ProfileScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
           <View style={styles.favGrid}>
-            {favoriteProviders.length > 0 ? (
+            {favoritesPending ? (
+              <View style={[styles.favCard, styles.emptyCard]}>
+                <Feather name="heart" size={18} color={palette.gold} />
+                <Text style={styles.emptyCardTitle}>Loading favorites...</Text>
+                <Text style={styles.emptyCardText}>Fetching your saved providers.</Text>
+              </View>
+            ) : favoriteProviders.length > 0 ? (
               favoriteProviders.map((provider) => (
                 <TouchableOpacity
                   key={provider.id}

@@ -9,6 +9,10 @@ export interface ProviderListFilters {
   onlySubscribed?: boolean;
 }
 
+export interface ProviderListOptions {
+  force?: boolean;
+}
+
 const buildQueryString = (filters: ProviderListFilters) => {
   const params: string[] = [];
 
@@ -27,22 +31,29 @@ const buildQueryString = (filters: ProviderListFilters) => {
   return params.join('&');
 };
 
-const DIRECTORY_CACHE_MS = 60_000;
+const DIRECTORY_CACHE_MS = 15_000;
 const providerCache = new Map<string, { data: Provider[]; loadedAt: number }>();
 const providerRequests = new Map<string, Promise<Provider[]>>();
 let categoryCache: { data: Category[]; loadedAt: number } | null = null;
 let categoryRequest: Promise<Category[]> | null = null;
 
-const listProvidersCached = (filters: ProviderListFilters = {}) => {
+export const clearProviderDirectoryCache = () => {
+  providerCache.clear();
+  providerRequests.clear();
+  categoryCache = null;
+  categoryRequest = null;
+};
+
+const listProvidersCached = (filters: ProviderListFilters = {}, options: ProviderListOptions = {}) => {
   const query = buildQueryString(filters);
   const path = `providers${query ? `?${query}` : ''}`;
   const cached = providerCache.get(path);
-  if (cached && Date.now() - cached.loadedAt < DIRECTORY_CACHE_MS) {
+  if (!options.force && cached && Date.now() - cached.loadedAt < DIRECTORY_CACHE_MS) {
     return Promise.resolve(cached.data);
   }
 
   const existing = providerRequests.get(path);
-  if (existing) return existing;
+  if (!options.force && existing) return existing;
 
   const request = apiClient.get<Provider[]>(path)
     .then((data) => {

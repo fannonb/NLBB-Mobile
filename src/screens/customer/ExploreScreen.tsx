@@ -11,9 +11,9 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
-import { mergeCategoriesWithDefaults } from '../../constants/serviceCategories';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { useCurrentDeviceLocation } from '../../hooks/useCurrentDeviceLocation';
+import { useProviderDirectory } from '../../hooks/useProviderDirectory';
 import SearchBar from '../../components/SearchBar';
 import ExploreFilterSheet, {
   DEFAULT_EXPLORE_FILTERS,
@@ -23,11 +23,10 @@ import ExploreFilterSheet, {
 import EmptyState from '../../components/EmptyState';
 import ExploreCardSkeleton from '../../components/ExploreCardSkeleton';
 import CustomerAppHeader from '../../components/CustomerAppHeader';
-import { providerApi } from '../../lib/api/providers';
 import { withProviderDistances } from '../../lib/location/providerDistance';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
-import { Category, Provider } from '../../types';
+import { Provider } from '../../types';
 
 const FALLBACK_COVER =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
@@ -154,13 +153,11 @@ export default function ExploreScreen({ navigation, route }: any) {
   const currentLocation = useCurrentDeviceLocation();
   const { user } = useAuthStore();
   const { customerNotifications, hydrateCustomerNotifications } = useAppStore();
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<ExploreFilters>(DEFAULT_EXPLORE_FILTERS);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+  const { providers, categories, loading } = useProviderDirectory();
   const unreadCount = customerNotifications.filter((n) => !n.isRead).length;
 
   useEffect(() => {
@@ -169,39 +166,6 @@ export default function ExploreScreen({ navigation, route }: any) {
       navigation.setParams({ category: undefined });
     }
   }, [route?.params?.category]);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadData = async () => {
-      try {
-        const [providerResult, categoryResult] = await Promise.all([
-          providerApi.listProviders(),
-          providerApi.listCategories(),
-        ]);
-        if (!active) {
-          return;
-        }
-        setProviders(providerResult);
-        setCategories(mergeCategoriesWithDefaults(categoryResult));
-      } catch {
-        if (active) {
-          setProviders([]);
-          setCategories(mergeCategoriesWithDefaults([]));
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadData();
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     hydrateCustomerNotifications();

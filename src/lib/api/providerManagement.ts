@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import { Provider, Service } from '../../types';
 import { normalizeProviderMedia } from '../media';
 import { resolveImageUrl } from '../config';
+import { clearProviderDirectoryCache } from './providers';
 
 export type ProviderService = Service & { isActive: boolean };
 
@@ -77,6 +78,7 @@ const normalizeService = (service: Service): ProviderService => ({
 const invalidateProviderCaches = () => {
   profileCache = null;
   servicesCache = null;
+  clearProviderDirectoryCache();
 };
 
 export const providerManagementApi = {
@@ -103,6 +105,7 @@ export const providerManagementApi = {
   saveMyProfile: async (payload: ProviderProfilePayload) => {
     const provider = normalizeProviderMedia(await apiClient.post<Provider>('providers/me/profile', payload));
     profileCache = { data: provider, loadedAt: Date.now() };
+    clearProviderDirectoryCache();
     return provider;
   },
   saveMyRegistrationDetails: async (payload: ProviderRegistrationDetailsPayload) => {
@@ -110,6 +113,7 @@ export const providerManagementApi = {
       await apiClient.post<Provider>('providers/me/registration-details', payload)
     );
     profileCache = { data: provider, loadedAt: Date.now() };
+    clearProviderDirectoryCache();
     return provider;
   },
   setMyOpenState: async (isOpen: boolean) => {
@@ -117,6 +121,7 @@ export const providerManagementApi = {
       await apiClient.patch<Provider>('providers/me/open-state', { isOpen })
     );
     profileCache = { data: provider, loadedAt: Date.now() };
+    clearProviderDirectoryCache();
     return provider;
   },
   uploadMyMedia: async (payload: ProviderMediaUploadPayload) => {

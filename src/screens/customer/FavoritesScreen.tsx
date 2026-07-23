@@ -5,12 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { useCurrentDeviceLocation } from '../../hooks/useCurrentDeviceLocation';
+import { useProviderDirectory } from '../../hooks/useProviderDirectory';
 import EmptyState from '../../components/EmptyState';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { withProviderDistances } from '../../lib/location/providerDistance';
-import { providerApi } from '../../lib/api/providers';
 import { useAppStore } from '../../store/appStore';
-import { Provider } from '../../types';
 
 const FALLBACK_COVER =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
@@ -79,40 +78,30 @@ export default function FavoritesScreen({ navigation }: any) {
   const currentLocation = useCurrentDeviceLocation();
   const { favorites, removeFavorite, hydrateFavorites } = useAppStore();
   const { isLoggedIn, requireAuth } = useRequireAuth();
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { providers, loading } = useProviderDirectory();
+  const [favoritesLoading, setFavoritesLoading] = useState(isLoggedIn);
 
   useEffect(() => {
     let active = true;
 
-    const loadProviders = async () => {
-      try {
-        const result = await providerApi.listProviders();
-        if (!active) {
-          return;
-        }
-        setProviders(result);
-      } catch {
-        if (active) {
-          setProviders([]);
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
+    if (!isLoggedIn) {
+      setFavoritesLoading(false);
+      return () => {
+        active = false;
+      };
+    }
 
-    loadProviders();
+    setFavoritesLoading(true);
+    hydrateFavorites().finally(() => {
+      if (active) {
+        setFavoritesLoading(false);
+      }
+    });
 
     return () => {
       active = false;
     };
-  }, []);
-
-  useEffect(() => {
-    hydrateFavorites();
-  }, [hydrateFavorites]);
+  }, [hydrateFavorites, isLoggedIn]);
 
   const favoriteProviders = useMemo(() => {
     return withProviderDistances(
@@ -120,6 +109,15 @@ export default function FavoritesScreen({ navigation }: any) {
       currentLocation,
     );
   }, [providers, favorites, currentLocation]);
+
+  const emptyTitle =
+    favoritesLoading || (loading && favorites.length > 0)
+      ? 'Loading favorites...'
+      : 'No Favorites Yet';
+  const emptyText =
+    favoritesLoading || (loading && favorites.length > 0)
+      ? 'Fetching your saved providers'
+      : 'Heart a provider to save them here';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -148,8 +146,8 @@ export default function FavoritesScreen({ navigation }: any) {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Feather name="heart" size={48} color={palette.border} />
-            <Text style={styles.emptyTitle}>{loading ? 'Loading favorites...' : 'No Favorites Yet'}</Text>
-            <Text style={styles.emptyText}>Heart a provider to save them here</Text>
+            <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+            <Text style={styles.emptyText}>{emptyText}</Text>
           </View>
         }
         renderItem={({ item }) => (
