@@ -20,7 +20,6 @@ import { NLBBButton } from './ui';
 import { useBookingSheetStore } from '../store/bookingSheetStore';
 import { useBookingDataStore } from '../store/bookingDataStore';
 import { useAppStore } from '../store/appStore';
-import { useAuthStore } from '../store/authStore';
 import { providerApi } from '../lib/api/providers';
 import {
   bookingApi,
@@ -396,7 +395,6 @@ export default function BookingSheet() {
   const styles = useMemo(() => createSheetStyles(palette, shadow), [palette, shadow]);
 
   const { visible, payload, close } = useBookingSheetStore();
-  const user = useAuthStore((state) => state.user);
   const keyboardHeight = useKeyboardHeight(visible);
   const addBookingRecord = useBookingDataStore((state) => state.addBookingRecord);
   const [phase, setPhase] = useState<SheetPhase>('service');
@@ -420,11 +418,9 @@ export default function BookingSheet() {
   const [selectedDateIdx, setSelectedDateIdx] = useState(0);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
-  const [paymentPhone, setPaymentPhone] = useState('');
   const [createdBooking, setCreatedBooking] = useState<BookingRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('Sending your booking request...');
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
 
   const dates = useMemo(() => generateBookingDates(), []);
   const selectedDate = dates[selectedDateIdx];
@@ -450,11 +446,9 @@ export default function BookingSheet() {
     setSelectedDateIdx(0);
     setSelectedTime(null);
     setNotes('');
-    setPaymentPhone(user?.phone ?? '');
     setCreatedBooking(null);
     setSubmitError(null);
     setLoadingMessage('Sending your booking request...');
-    setPaymentStatus(null);
     setLoadError(null);
 
     const preselected = payload.preselectedServiceId ?? null;
@@ -497,7 +491,7 @@ export default function BookingSheet() {
     return () => {
       active = false;
     };
-  }, [visible, payload, user?.phone]);
+  }, [visible, payload]);
 
   const handleClose = () => {
     close();
@@ -523,12 +517,6 @@ export default function BookingSheet() {
 
   const handleSubmit = async () => {
     if (!payload || !selectedService || !selectedTime) return;
-    const trimmedPaymentPhone = paymentPhone.trim();
-
-    if (trimmedPaymentPhone.length < 9) {
-      setSubmitError('Enter the Safaricom M-Pesa number that should receive the STK prompt.');
-      return;
-    }
 
     if (!isBookingSlotAvailable(selectedDate, selectedTime)) {
       setSubmitError('That time slot is no longer available. Please pick another available time.');
@@ -540,7 +528,6 @@ export default function BookingSheet() {
     setPhase('loading');
     setSubmitError(null);
     setLoadingMessage('Sending your booking request...');
-    setPaymentStatus(null);
 
     try {
       const scheduledAt = buildScheduledAt(selectedDate, selectedTime);
@@ -555,23 +542,6 @@ export default function BookingSheet() {
       });
       addBookingRecord(booking);
       setCreatedBooking(booking);
-      setLoadingMessage('Sending M-Pesa STK prompt...');
-      await bookingApi.initiateBookingPayment(booking.id, trimmedPaymentPhone);
-      setLoadingMessage('Waiting for M-Pesa confirmation...');
-
-      const pollIntervalsMs = [4000, 7000, 10000, 15000, 20000];
-      let latestStatus: 'unpaid' | 'pending' | 'success' | 'failed' = 'pending';
-
-      for (const intervalMs of pollIntervalsMs) {
-        await new Promise((resolve) => setTimeout(resolve, intervalMs));
-        const status = await bookingApi.getBookingPaymentStatus(booking.id, { reconcile: true });
-        latestStatus = status.status;
-        if (status.status === 'success' || status.status === 'failed') {
-          break;
-        }
-      }
-
-      setPaymentStatus(latestStatus === 'success' ? 'success' : latestStatus === 'failed' ? 'failed' : 'pending');
       setPhase('success');
       // Surface the "booking requested" notification immediately (push is unreliable in Expo Go).
       void useAppStore.getState().hydrateCustomerNotifications({ force: true });
@@ -723,22 +693,8 @@ export default function BookingSheet() {
           </View>
         ))}
         <Text style={styles.priceNote}>
-          Total Ksh {selectedService?.price.toLocaleString()} payable now via M-Pesa STK push.
+          Service price: Ksh {selectedService?.price.toLocaleString()}. Booking is free in the app. You will coordinate directly with the provider.
         </Text>
-        <Text style={styles.sectionLabel}>M-Pesa number</Text>
-        <View style={styles.notesInput}>
-          <TextInput
-            value={paymentPhone}
-            onChangeText={(value) => {
-              setSubmitError(null);
-              setPaymentPhone(value);
-            }}
-            placeholder="07... or 254..."
-            placeholderTextColor={palette.textMuted}
-            style={styles.notesText}
-            keyboardType="phone-pad"
-          />
-        </View>
         {submitError ? (
           <Text style={[styles.priceNote, { color: palette.error, marginTop: 8 }]}>{submitError}</Text>
         ) : null}
@@ -759,19 +715,9 @@ export default function BookingSheet() {
         <Animated.View style={[styles.successCircle, { transform: [{ scale: successScaleAnim }] }]}>
           <Feather name="check" size={36} color={palette.bg} />
         </Animated.View>
-        <Text style={styles.successTitle}>
-          {paymentStatus === 'success'
-            ? 'Booking paid'
-            : paymentStatus === 'failed'
-              ? 'Payment not completed'
-              : 'Payment pending'}
-        </Text>
+        <Text style={styles.successTitle}>Booking request sent</Text>
         <Text style={styles.successSub}>
-          {paymentStatus === 'success'
-            ? `Your request was sent to ${payload?.providerName} and your payment was confirmed.`
-            : paymentStatus === 'failed'
-              ? 'Your booking request was saved, but M-Pesa did not complete the payment.'
-              : 'Your booking request was saved. M-Pesa confirmation is still pending and will update shortly.'}
+          Your request was sent to {payload?.providerName}. The provider can now review the booking and confirm it.
         </Text>
         <View style={styles.successCard}>
           <View style={styles.successRow}>
@@ -852,7 +798,7 @@ export default function BookingSheet() {
             variant="secondary"
             style={{ flex: 0.85 }}
           />
-          <NLBBButton label="Confirm & pay" onPress={handleSubmit} style={{ flex: 1.15 }} />
+          <NLBBButton label="Confirm booking" onPress={handleSubmit} style={{ flex: 1.15 }} />
         </View>
       </View>
     );

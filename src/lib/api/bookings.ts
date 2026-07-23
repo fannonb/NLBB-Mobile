@@ -46,23 +46,6 @@ export interface UpdateBookingStatusPayload {
   status: 'confirmed' | 'upcoming' | 'accepted' | 'declined' | 'rejected' | 'completed' | 'cancelled';
 }
 
-export interface InitiateBookingPaymentResponse {
-  checkoutRequestId: string;
-  message?: string;
-  status?: 'pending' | 'success';
-}
-
-export interface BookingPaymentStatus {
-  bookingId: string;
-  paymentId?: string;
-  status: 'unpaid' | 'pending' | 'success' | 'failed';
-  amount: number;
-  checkoutRequestId?: string;
-  merchantRequestId?: string;
-  mpesaReceiptNumber?: string;
-  updatedAt?: string;
-}
-
 export interface CustomerBookingCard extends Omit<Booking, 'date' | 'time' | 'endTime' | 'status'> {
   scheduledAt: string;
   endAt: string;
@@ -316,14 +299,6 @@ export const mapBookingStatusToBackend = (
 export const bookingApi = {
   listMyBookings: () => apiClient.get<BookingRecord[]>('bookings/me'),
   createBooking: (payload: CreateBookingPayload) => apiClient.post<BookingRecord>('bookings', payload),
-  initiateBookingPayment: (bookingId: string, phoneNumber: string) =>
-    apiClient.post<InitiateBookingPaymentResponse>(`bookings/${bookingId}/pay`, {
-      phoneNumber,
-    }),
-  getBookingPaymentStatus: (bookingId: string, options?: { reconcile?: boolean }) =>
-    apiClient.get<BookingPaymentStatus>(
-      options?.reconcile ? `bookings/${bookingId}/payment-status?reconcile=true` : `bookings/${bookingId}/payment-status`
-    ),
   updateBookingStatus: (bookingId: string, status: UpdateBookingStatusPayload['status']) =>
     apiClient.patch<BookingRecord>(`bookings/${bookingId}/status`, {
       status: mapBookingStatusToBackend(status),
