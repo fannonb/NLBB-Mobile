@@ -21,7 +21,6 @@ import {
 } from '../lib/demo/demoSession';
 import { ALLOW_SEEDED_IDENTITIES, ENABLE_DEMO_MODE } from '../lib/demo/config';
 import { resetDemoState } from '../lib/demo/demoState';
-import { registerForPushNotificationsAsync } from '../lib/push';
 import { useAppStore } from './appStore';
 import { useBookingDataStore } from './bookingDataStore';
 import { resolveImageUrl } from '../lib/config';
@@ -113,8 +112,6 @@ const hydrateUserPreferences = async () => {
   } catch {
     // Keep local preferences if backend preferences are unavailable.
   }
-
-  void registerForPushNotificationsAsync();
 };
 
 const warmSignedInAppState = (user: User) => {
@@ -134,8 +131,8 @@ const resetSignedOutState = () => {
   useBookingDataStore.getState().resetBookings();
 };
 
-const persistUser = (user: User) => {
-  void setStoredUser(user);
+const persistUser = async (user: User) => {
+  await setStoredUser(user);
 };
 
 const invalidateLocalSession = (set: (state: Partial<AuthState>) => void) => {
@@ -160,9 +157,9 @@ const applySession = async (set: (state: Partial<AuthState>) => void, session: A
 
   const user = mapBackendUserToAppUser(session.user);
   lastUserRefreshAt = Date.now();
+  await persistSession(session);
+  await persistUser(user);
   set({ user, isLoggedIn: true });
-  void persistSession(session);
-  persistUser(user);
   warmSignedInAppState(user);
   return user;
 };
@@ -231,7 +228,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const user = mapBackendUserToAppUser(profile);
             set({ user, isLoggedIn: true });
             lastUserRefreshAt = Date.now();
-            persistUser(user);
+            void persistUser(user);
             if (!cachedUser) {
               warmSignedInAppState(user);
             }
@@ -289,7 +286,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const user = mapBackendUserToAppUser(profile);
       set({ user, isLoggedIn: true });
-      persistUser(user);
+      void persistUser(user);
       lastUserRefreshAt = Date.now();
     } catch (error) {
       const currentSession = await getStoredSession();

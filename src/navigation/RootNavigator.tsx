@@ -54,6 +54,12 @@ const CustomerTabNavigator = lazyScreen(() => require('./CustomerTabNavigator'))
 const ProviderTabNavigator = lazyScreen(() => require('./ProviderTabNavigator'));
 const AdminTabNavigator = lazyScreen(() => require('./AdminTabNavigator'));
 
+const RouteLoadingState = ({ colors }: { colors: ReturnType<typeof getThemeColors> }) => (
+  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
+    <ActivityIndicator size="small" color={colors.gold} />
+  </View>
+);
+
 const GuestOrCustomerRoute = ({ component: Component, ...props }: { component: React.ComponentType<any>; [key: string]: any }) => {
   const user = useAuthStore((state) => state.user);
   const isReady = useAuthStore((state) => state.isReady);
@@ -70,15 +76,11 @@ const GuestOrCustomerRoute = ({ component: Component, ...props }: { component: R
   }, [isReady, props.navigation, user?.role]);
 
   if (!isReady) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-        <ActivityIndicator size="small" color={colors.gold} />
-      </View>
-    );
+    return <RouteLoadingState colors={colors} />;
   }
 
   if (user?.role === 'provider' || user?.role === 'admin') {
-    return null;
+    return <RouteLoadingState colors={colors} />;
   }
 
   return <Component {...props} />;
@@ -103,15 +105,11 @@ const ProviderOnlyRoute = ({ component: Component, ...props }: { component: Reac
   }, [isReady, props.navigation, user]);
 
   if (!isReady) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-        <ActivityIndicator size="small" color={colors.gold} />
-      </View>
-    );
+    return <RouteLoadingState colors={colors} />;
   }
 
   if (!user || user.role !== 'provider') {
-    return null;
+    return <RouteLoadingState colors={colors} />;
   }
 
   return <Component {...props} />;

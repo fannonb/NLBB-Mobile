@@ -79,11 +79,13 @@ export const registerForPushNotificationsAsync = async () => {
     }
 
     if (finalStatus !== 'granted') {
+      console.warn('[Push] Notification permission was not granted:', finalStatus);
       return null;
     }
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     if (!projectId) {
+      console.warn('[Push] Missing EAS project ID; cannot request Expo push token.');
       return null;
     }
 
@@ -93,6 +95,7 @@ export const registerForPushNotificationsAsync = async () => {
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
       token,
     });
+    console.log('[Push] Push token registered with backend.');
 
     return token;
   } catch (error) {

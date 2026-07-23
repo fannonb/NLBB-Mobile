@@ -1183,7 +1183,6 @@ export default function ProviderProfileScreen({ navigation }: any) {
             <TouchableOpacity
               onPress={async () => {
                 await logout();
-                navigation.replace('Login', { role: 'provider' });
               }}
               style={styles.logoutBtn}
             >

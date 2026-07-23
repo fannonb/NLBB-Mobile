@@ -15,7 +15,11 @@ import { useAuthStore } from './src/store/authStore';
 import { useBookingDataStore } from './src/store/bookingDataStore';
 import RootNavigator from './src/navigation/RootNavigator';
 import { navigateFromNotificationPayload } from './src/lib/notificationNavigation';
-import { PushNotificationPayload, subscribeToPushNotifications } from './src/lib/push';
+import {
+  PushNotificationPayload,
+  registerForPushNotificationsAsync,
+  subscribeToPushNotifications,
+} from './src/lib/push';
 
 const THEME_BOOTSTRAP_TIMEOUT_MS = 1500;
 
@@ -220,6 +224,8 @@ export default function App() {
     if (userRole !== 'provider' && userRole !== 'customer') {
       return;
     }
+
+    void registerForPushNotificationsAsync();
 
     const poll = setInterval(() => {
       void pollNotificationsForSignedInUser();

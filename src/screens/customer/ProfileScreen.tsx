@@ -542,7 +542,6 @@ export default function ProfileScreen({ navigation }: any) {
         <TouchableOpacity
           onPress={async () => {
             await logout();
-            navigation.replace('CustomerApp');
           }}
           style={styles.logoutBtn}
         >
