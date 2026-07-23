@@ -1,12 +1,12 @@
 import { API_BASE_URLS } from '../config';
 
 /** Per-candidate timeout once a healthy base is known */
-const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_TIMEOUT_MS = 20000;
 /** Short probe timeout while discovering which base URL works */
-const PROBE_TIMEOUT_MS = 4000;
+const PROBE_TIMEOUT_MS = 7000;
 /** Fast fail when health probe recently failed (backend offline) */
-const OFFLINE_TIMEOUT_MS = 5000;
-const OFFLINE_RETRY_MS = 20_000;
+const OFFLINE_TIMEOUT_MS = 10000;
+const OFFLINE_RETRY_MS = 5_000;
 
 let lastKnownGoodBaseUrl: string | null = API_BASE_URLS[0] ?? null;
 let probingPromise: Promise<string | null> | null = null;
@@ -135,17 +135,13 @@ export const fetchWithApiBaseUrlFallback = async (
     const probed = await probeHealthyBaseUrl();
     if (probed) {
       markApiBaseUrlHealthy(probed);
-    } else {
-      backendUnavailableUntil = Date.now() + OFFLINE_RETRY_MS;
     }
-    backendRecentlyUnavailable = Date.now() < backendUnavailableUntil;
+    backendRecentlyUnavailable = false;
   }
 
-  const attemptedBaseUrls = backendRecentlyUnavailable
-    ? [API_BASE_URLS[0] ?? getApiBaseUrlCandidates()[0]].filter(Boolean) as string[]
-    : getApiBaseUrlCandidates();
+  const attemptedBaseUrls = getApiBaseUrlCandidates();
 
-  const effectiveTimeout = backendRecentlyUnavailable ? OFFLINE_TIMEOUT_MS : timeoutMs;
+  const effectiveTimeout = backendRecentlyUnavailable ? Math.max(timeoutMs, OFFLINE_TIMEOUT_MS) : timeoutMs;
 
   for (let index = 0; index < attemptedBaseUrls.length; index += 1) {
     const candidateBaseUrl = attemptedBaseUrls[index];

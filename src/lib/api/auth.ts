@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 import { API_BASE_URLS } from '../config';
 import { UserRole } from '../../types';
-import { createApiClientError } from './client';
+import { createApiClientError, getBackendUnavailableMessage, getDefaultRequestFailureMessage } from './client';
 import { fetchWithApiBaseUrlFallback } from './baseUrl';
 import { normalizeAvatarRecord } from '../media';
 
@@ -52,7 +52,7 @@ const requestAuth = async <T>(path: string, body?: unknown, timeoutMs = 12000) =
       networkErrors,
     });
     throw createApiClientError(
-      `Cannot reach backend. Tried: ${API_BASE_URLS.join(', ')}`,
+      getBackendUnavailableMessage(networkErrors.some((entry) => entry.includes('timed out'))),
       0,
       'BACKEND_UNREACHABLE',
       {
@@ -72,7 +72,7 @@ const requestAuth = async <T>(path: string, body?: unknown, timeoutMs = 12000) =
 
   if (!response.ok || !payload?.success) {
     throw createApiClientError(
-      payload?.error?.message ?? `Request failed (${response.status}) via ${resolvedBaseUrl ?? 'unknown-base-url'}`,
+      payload?.error?.message ?? getDefaultRequestFailureMessage(response.status),
       response.status,
       payload?.error?.code,
       undefined
@@ -105,7 +105,7 @@ const requestAuthWithBearer = async <T>(path: string, accessToken: string, body?
       networkErrors,
     });
     throw createApiClientError(
-      `Cannot reach backend. Tried: ${API_BASE_URLS.join(', ')}`,
+      getBackendUnavailableMessage(networkErrors.some((entry) => entry.includes('timed out'))),
       0,
       'BACKEND_UNREACHABLE',
       {
@@ -125,7 +125,7 @@ const requestAuthWithBearer = async <T>(path: string, accessToken: string, body?
 
   if (!response.ok || !payload?.success) {
     throw createApiClientError(
-      payload?.error?.message ?? `Request failed (${response.status}) via ${resolvedBaseUrl ?? 'unknown-base-url'}`,
+      payload?.error?.message ?? getDefaultRequestFailureMessage(response.status),
       response.status,
       payload?.error?.code,
       undefined

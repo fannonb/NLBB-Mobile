@@ -25,6 +25,14 @@ export type ApiClientError = Error & {
   details?: unknown;
 };
 
+const getBackendUnavailableMessage = (timedOut: boolean) =>
+  timedOut
+    ? 'The backend is taking too long to respond. Please try again shortly.'
+    : 'The backend is temporarily unavailable. Please try again shortly.';
+
+const getDefaultRequestFailureMessage = (status: number) =>
+  status >= 500 ? 'Unexpected server error. Please try again shortly.' : `Request failed (${status})`;
+
 const isPublicDemoPath = (path: string) => {
   const raw = path.split('?')[0];
   return (
@@ -61,6 +69,8 @@ export const isApiClientError = (error: unknown): error is ApiClientError =>
   error instanceof Error &&
   error.name === 'ApiClientError' &&
   typeof (error as ApiClientError).status === 'number';
+
+export { getBackendUnavailableMessage, getDefaultRequestFailureMessage };
 
 const defaultHeaders = {
   Accept: 'application/json',
@@ -118,9 +128,7 @@ const request = async <T>(
           : 'Backend is offline or wrong API URL. Ensure `npm run backend:dev` is running.',
     });
     throw createApiClientError(
-      networkErrors.some((entry) => entry.includes('timed out'))
-        ? `Backend timed out. Start it with: npm run backend:dev`
-        : `Cannot reach backend. Start it with: npm run backend:dev`,
+      getBackendUnavailableMessage(networkErrors.some((entry) => entry.includes('timed out'))),
       0,
       'BACKEND_UNREACHABLE',
       {
@@ -147,7 +155,7 @@ const request = async <T>(
   if (!response.ok || !payload?.success) {
     const error = payload?.error;
     throw createApiClientError(
-      error?.message ?? `Request failed (${response.status}) via ${resolvedBaseUrl ?? 'unknown-base-url'}`,
+      error?.message ?? getDefaultRequestFailureMessage(response.status),
       response.status,
       error?.code,
       error?.details
