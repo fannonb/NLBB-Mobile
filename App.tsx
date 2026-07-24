@@ -13,6 +13,7 @@ import { loadThemePreference } from './src/lib/themePreference';
 import { useAppStore } from './src/store/appStore';
 import { useAuthStore } from './src/store/authStore';
 import { useBookingDataStore } from './src/store/bookingDataStore';
+import { touchStoredSessionActivity } from './src/lib/authSession';
 import RootNavigator from './src/navigation/RootNavigator';
 import { navigateFromNotificationPayload } from './src/lib/notificationNavigation';
 import {
@@ -212,8 +213,16 @@ export default function App() {
   useEffect(() => {
     let lastState: AppStateStatus = AppState.currentState;
     const subscription = AppState.addEventListener('change', (nextState) => {
+      if (lastState === 'active' && nextState.match(/inactive|background/)) {
+        void touchStoredSessionActivity();
+      }
       if (lastState.match(/inactive|background/) && nextState === 'active') {
-        void hydrateNotificationsForSignedInUser();
+        void (async () => {
+          const sessionStillValid = await useAuthStore.getState().handleAppActivated();
+          if (sessionStillValid) {
+            await hydrateNotificationsForSignedInUser();
+          }
+        })();
       }
       lastState = nextState;
     });

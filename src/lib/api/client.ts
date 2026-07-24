@@ -1,6 +1,6 @@
 import { User } from '../../types';
 import { API_BASE_URLS } from '../config';
-import { getAccessToken, refreshStoredSession } from '../authSession';
+import { getAccessToken, refreshStoredSession, touchStoredSessionActivity } from '../authSession';
 import { fetchWithApiBaseUrlFallback } from './baseUrl';
 import { getDemoUserFromToken } from '../demo/demoSession';
 import { handleDemoRequest } from '../demo/demoApi';
@@ -136,6 +136,10 @@ const request = async <T>(
         errors: networkErrors,
       }
     );
+  }
+
+  if (token) {
+    void touchStoredSessionActivity();
   }
 
   let payload: ApiResponseEnvelope<T> | null = null;

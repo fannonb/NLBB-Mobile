@@ -27,11 +27,25 @@ export default function LoginScreen({ navigation, route }: any) {
   const [errorTitle, setErrorTitle] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [errorHint, setErrorHint] = useState<string | undefined>(undefined);
-  const { login } = useAuthStore();
+  const { login, consumeAuthNotice } = useAuthStore();
 
   useEffect(() => {
     setRole(requestedRole);
   }, [requestedRole]);
+
+  useEffect(() => {
+    const notice = consumeAuthNotice();
+    if (!notice) {
+      return;
+    }
+
+    showLoginError({
+      type: 'server',
+      title: 'Session Expired',
+      message: notice,
+      hint: 'Sign in again to continue.',
+    });
+  }, [consumeAuthNotice]);
 
   const showLoginError = ({
     type,

@@ -5,8 +5,10 @@ import { isApiClientError } from '../lib/api/client';
 import { authApi, AuthSessionResponse, BackendUserProfile } from '../lib/api/auth';
 import {
   clearStoredAuth,
+  getStoredSessionState,
   getStoredSession,
   getStoredUser,
+  refreshStoredSessionIfNeeded,
   setStoredSession,
   setStoredUser,
 } from '../lib/authSession';
@@ -30,8 +32,11 @@ interface AuthState {
   isLoggedIn: boolean;
   isInitializing: boolean;
   isReady: boolean;
+  authNotice: string | null;
   initialize: () => Promise<void>;
   refreshCurrentUser: (options?: { force?: boolean }) => Promise<void>;
+  handleAppActivated: () => Promise<boolean>;
+  consumeAuthNotice: () => string | null;
   login: (
     email: string,
     password: string,
@@ -88,6 +93,8 @@ let initializePromise: Promise<void> | null = null;
 let refreshUserPromise: Promise<void> | null = null;
 let lastUserRefreshAt = 0;
 const USER_REFRESH_COOLDOWN_MS = 30_000;
+const SESSION_TIMEOUT_NOTICE = 'Your session expired after inactivity. Please sign in again.';
+const SESSION_EXPIRED_NOTICE = 'Your session expired. Please sign in again.';
 
 const persistSession = async (session: AuthSessionResponse) => {
   await setStoredSession({
@@ -135,9 +142,12 @@ const persistUser = async (user: User) => {
   await setStoredUser(user);
 };
 
-const invalidateLocalSession = (set: (state: Partial<AuthState>) => void) => {
+const noticeForSessionState = (state: 'idle_timeout' | 'token_expired') =>
+  state === 'idle_timeout' ? SESSION_TIMEOUT_NOTICE : SESSION_EXPIRED_NOTICE;
+
+const invalidateLocalSession = (set: (state: Partial<AuthState>) => void, authNotice: string | null = null) => {
   lastUserRefreshAt = 0;
-  set({ user: null, isLoggedIn: false, isInitializing: false, isReady: true });
+  set({ user: null, isLoggedIn: false, isInitializing: false, isReady: true, authNotice });
   resetSignedOutState();
   void clearStoredAuth();
 };
@@ -169,6 +179,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoggedIn: false,
   isInitializing: false,
   isReady: false,
+  authNotice: null,
 
   initialize: async () => {
     if (initialized && get().isReady) {
@@ -190,15 +201,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           getStoredUser(),
         ]);
         if (!session) {
-          set({ user: null, isLoggedIn: false, isReady: true, isInitializing: false });
+          set({ user: null, isLoggedIn: false, isReady: true, isInitializing: false, authNotice: null });
           void setStoredUser(null);
           return;
         }
 
-        const demoUser = ENABLE_DEMO_MODE ? getDemoUserFromToken(session.accessToken) : null;
+        const sessionState = await getStoredSessionState();
+        if (sessionState === 'idle_timeout' || sessionState === 'token_expired') {
+          invalidateLocalSession(set, noticeForSessionState(sessionState));
+          return;
+        }
+
+        const refreshedSession = await refreshStoredSessionIfNeeded();
+        if (!refreshedSession) {
+          invalidateLocalSession(set, SESSION_EXPIRED_NOTICE);
+          return;
+        }
+        const activeSession = refreshedSession;
+
+        const demoUser = ENABLE_DEMO_MODE ? getDemoUserFromToken(activeSession.accessToken) : null;
         if (demoUser) {
           resetDemoState();
-          set({ user: demoUser, isLoggedIn: true, isReady: true, isInitializing: false });
+          set({ user: demoUser, isLoggedIn: true, isReady: true, isInitializing: false, authNotice: null });
           return;
         }
 
@@ -207,6 +231,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoggedIn: cachedUser !== null,
           isReady: true,
           isInitializing: false,
+          authNotice: null,
         });
         if (cachedUser) {
           lastUserRefreshAt = Date.now();
@@ -217,7 +242,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           try {
             const profile = await authApi.getMe();
             const currentSession = await getStoredSession();
-            if (currentSession?.accessToken !== session.accessToken) {
+            if (currentSession?.accessToken !== activeSession.accessToken) {
               return;
             }
             if (!profile || isBlockedSeededProfile(profile)) {
@@ -235,7 +260,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           } catch (error) {
             const currentSession = await getStoredSession();
             if (
-              currentSession?.accessToken === session.accessToken &&
+              currentSession?.accessToken === activeSession.accessToken &&
               isApiClientError(error) &&
               (error.status === 401 || error.status === 403)
             ) {
@@ -262,7 +287,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     refreshUserPromise = (async () => {
-    const session = await getStoredSession();
+    const session = await refreshStoredSessionIfNeeded();
     if (!session) {
       set({ user: null, isLoggedIn: false });
       return;
@@ -305,6 +330,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return refreshUserPromise;
   },
 
+  handleAppActivated: async () => {
+    const sessionState = await getStoredSessionState();
+    if (sessionState === 'missing') {
+      return false;
+    }
+
+    if (sessionState === 'idle_timeout' || sessionState === 'token_expired') {
+      invalidateLocalSession(set, noticeForSessionState(sessionState));
+      return false;
+    }
+
+    const session = await refreshStoredSessionIfNeeded();
+    if (!session) {
+      invalidateLocalSession(set, SESSION_EXPIRED_NOTICE);
+      return false;
+    }
+
+    await get().refreshCurrentUser({ force: true });
+    return Boolean(get().user);
+  },
+
+  consumeAuthNotice: () => {
+    const notice = get().authNotice;
+    if (notice) {
+      set({ authNotice: null });
+    }
+    return notice;
+  },
+
   login: async (email: string, password: string, expectedRole?: UserRole) => {
     // Demo shortcut — works entirely offline, no backend required.
     const normalizedEmail = email.trim().toLowerCase();
@@ -318,7 +372,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       resetDemoState();
       await setStoredSession({ accessToken: demoTokenFor(normalizedEmail), refreshToken: '', expiresIn: 86400 });
-      set({ user: demoUser, isLoggedIn: true });
+      set({ user: demoUser, isLoggedIn: true, authNotice: null });
       resetSignedOutState();
       return { success: true, role: demoUser.role };
     }
@@ -341,7 +395,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (expectedRole && role && role !== expectedRole) {
         void authApi.logoutWithAccessToken(session.accessToken).catch(() => undefined);
         void clearStoredAuth();
-        set({ user: null, isLoggedIn: false });
+        set({ user: null, isLoggedIn: false, authNotice: null });
         resetSignedOutState();
         return {
           success: false,
@@ -413,7 +467,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     lastUserRefreshAt = 0;
     const sessionPromise = getStoredSession();
-    set({ user: null, isLoggedIn: false, isInitializing: false, isReady: true });
+    set({ user: null, isLoggedIn: false, isInitializing: false, isReady: true, authNotice: null });
     resetSignedOutState();
     void clearStoredAuth();
 
