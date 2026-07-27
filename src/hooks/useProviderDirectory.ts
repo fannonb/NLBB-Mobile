@@ -109,7 +109,8 @@ export const useProviderDirectory = () => {
 
     const onAppStateChange = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
-        void loadProviderDirectory({ force: sharedState.providers.length === 0 });
+        // Always re-fetch on resume so unpaid providers do not linger after payment.
+        void loadProviderDirectory({ force: true });
       }
     };
 
@@ -123,6 +124,7 @@ export const useProviderDirectory = () => {
 
   useFocusEffect(
     useCallback(() => {
+      // Respect the short TTL unless the directory is empty.
       void loadProviderDirectory({ force: sharedState.providers.length === 0 });
     }, [])
   );

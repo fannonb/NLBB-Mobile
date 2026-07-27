@@ -20,6 +20,7 @@ import { publicConfigApi, PublicReleaseConfig } from '../../lib/api/publicConfig
 import { subscriptionsApi } from '../../lib/api/subscriptions';
 import { paymentsApi } from '../../lib/api/payments';
 import { providerManagementApi } from '../../lib/api/providerManagement';
+import { clearProviderDirectoryCache } from '../../lib/api/providers';
 import { Payment, Subscription } from '../../types';
 
 const formatDate = (value?: string | null) => {
@@ -331,7 +332,7 @@ export default function SubscriptionScreen({ navigation }: any) {
     () => payments.filter((payment) => payment.status === 'success'),
     [payments]
   );
-  const mpesaEnabled = releaseConfig?.featureFlags.mpesaEnabled ?? true;
+  const mpesaEnabled = releaseConfig?.featureFlags.mpesaEnabled ?? false;
 
   const paymentConfirmed = (latest: Subscription | null, baseline: NonNullable<typeof paymentBaselineRef.current>) => {
     if (!isSubscriptionActive(latest)) {
@@ -373,6 +374,7 @@ export default function SubscriptionScreen({ navigation }: any) {
           awaitingPaymentRef.current = false;
           paymentBaselineRef.current = null;
           setInfoModal((current) => ({ ...current, visible: false }));
+          clearProviderDirectoryCache();
           await loadData(false);
           setSuccessModal({
             visible: true,

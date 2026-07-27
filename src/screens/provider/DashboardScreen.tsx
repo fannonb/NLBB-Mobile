@@ -12,9 +12,12 @@ import { useAppStore } from '../../store/appStore';
 import { useBookingDataStore } from '../../store/bookingDataStore';
 import { resolveImageUrl } from '../../lib/config';
 import { toProviderAppointmentCard } from '../../lib/api/bookings';
+import { isApiClientError } from '../../lib/api/client';
 import { providerManagementApi } from '../../lib/api/providerManagement';
+import { subscriptionsApi } from '../../lib/api/subscriptions';
 import { useAuthStore } from '../../store/authStore';
 import { openPhoneNumber, openWhatsAppContact } from '../../lib/contactActions';
+import type { Subscription } from '../../types';
 
 const DEFAULT_COVER =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
@@ -401,6 +404,7 @@ export default function DashboardScreen({ navigation }: any) {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const hasLoadedProfile = useRef(false);
   const [togglingOpen, setTogglingOpen] = useState(false);
+  const [subscriptionActive, setSubscriptionActive] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -409,6 +413,13 @@ export default function DashboardScreen({ navigation }: any) {
 
   const week = useMemo(() => generateWeek(), []);
 
+  const isSubscriptionActive = (value: Subscription | null) => {
+    if (!value || value.status !== 'active') {
+      return false;
+    }
+    return new Date(value.renewalDate).getTime() > Date.now();
+  };
+
   const loadDashboardData = useCallback(async (active?: { current: boolean }) => {
     const isActive = () => (active ? active.current : true);
     if (!hasLoadedProfile.current) {
@@ -416,11 +427,14 @@ export default function DashboardScreen({ navigation }: any) {
     }
     void hydrateProviderNotifications({ force: true });
     try {
-      const [, provider] = await Promise.all([
+      const [, provider, subscription] = await Promise.all([
         loadMyBookings(),
         providerManagementApi.getMyProfile().catch(() => null),
+        subscriptionsApi.getMySubscription({ reconcile: true }).catch(() => null),
       ]);
       if (!isActive()) return;
+      const planActive = isSubscriptionActive(subscription);
+      setSubscriptionActive(planActive);
       if (provider) {
         updateProviderProfile({
           businessName: provider.name,
@@ -436,7 +450,8 @@ export default function DashboardScreen({ navigation }: any) {
           workingHours: provider.workingHours ?? [],
           galleryImages: provider.galleryImages ?? provider.images ?? [],
           mpesaPhone: provider.mpesaPhone ?? provider.phone ?? '',
-          isOpen: provider.isOpen ?? true,
+          // Never treat a missing flag as open — unpaid providers stay closed.
+          isOpen: planActive ? Boolean(provider.isOpen) : false,
         });
       }
     } catch {
@@ -479,6 +494,15 @@ export default function DashboardScreen({ navigation }: any) {
   );
 
   const handleToggleOpen = async (next: boolean) => {
+    if (next && !subscriptionActive) {
+      setToast({
+        visible: true,
+        message: 'Activate your subscription before opening bookings.',
+        type: 'error',
+      });
+      return;
+    }
+
     setTogglingOpen(true);
     updateProviderProfile({ isOpen: next });
     try {
@@ -488,9 +512,15 @@ export default function DashboardScreen({ navigation }: any) {
         message: next ? 'You are now visible as open.' : 'Marked closed — bookings paused.',
         type: 'success',
       });
-    } catch {
+    } catch (error) {
       updateProviderProfile({ isOpen: !next });
-      setToast({ visible: true, message: 'Could not update status. Try again.', type: 'error' });
+      const message =
+        isApiClientError(error) && error.code === 'SUBSCRIPTION_INACTIVE'
+          ? 'Activate your subscription before opening bookings.'
+          : isApiClientError(error)
+            ? error.message
+            : 'Could not update status. Try again.';
+      setToast({ visible: true, message, type: 'error' });
     } finally {
       setTogglingOpen(false);
     }
@@ -524,8 +554,15 @@ export default function DashboardScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Business', { screen: 'Subscription' })}
             activeOpacity={0.85}
           >
-            <View style={styles.subChipDot} />
-            <Text style={styles.subChipText}>Plan active</Text>
+            <View
+              style={[
+                styles.subChipDot,
+                !subscriptionActive && { backgroundColor: palette.error },
+              ]}
+            />
+            <Text style={styles.subChipText}>
+              {subscriptionActive ? 'Plan active' : 'Subscription required'}
+            </Text>
           </TouchableOpacity>
         </View>
         <View style={styles.headerRight}>
@@ -555,16 +592,18 @@ export default function DashboardScreen({ navigation }: any) {
               {providerProfile.isOpen ? 'Open for bookings' : 'Closed'}
             </Text>
             <Text style={styles.statusSubtitle}>
-              {providerProfile.isOpen
-                ? 'Customers can see and book you now'
-                : 'Hidden from new bookings until reopened'}
+              {!subscriptionActive
+                ? 'Pay your subscription to unlock bookings'
+                : providerProfile.isOpen
+                  ? 'Customers can see and book you now'
+                  : 'Hidden from new bookings until reopened'}
             </Text>
           </View>
         </View>
         <Switch
           value={providerProfile.isOpen}
           onValueChange={handleToggleOpen}
-          disabled={togglingOpen}
+          disabled={togglingOpen || !subscriptionActive}
           trackColor={{ false: palette.border, true: palette.goldDim }}
           thumbColor={providerProfile.isOpen ? palette.gold : palette.textMuted}
         />
