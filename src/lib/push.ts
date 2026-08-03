@@ -54,9 +54,17 @@ const parsePushNotificationPayload = (data: unknown): PushNotificationPayload | 
     : null;
 };
 
+let registeredPushToken: string | null = null;
+export const hasRegisteredPushToken = () => registeredPushToken !== null;
+export const clearRegisteredPushToken = () => {
+  registeredPushToken = null;
+};
+
+
 export const registerForPushNotificationsAsync = async () => {
   try {
     if (isExpoGo) {
+      console.warn('[Push] Skipping push registration: running inside Expo Go (remote push unsupported).');
       return null;
     }
 
@@ -95,7 +103,8 @@ export const registerForPushNotificationsAsync = async () => {
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
       token,
     });
-    console.log('[Push] Push token registered with backend.');
+    registeredPushToken = token;
+    console.log('[Push] Push token registered with backend.', { projectId });
 
     return token;
   } catch (error) {

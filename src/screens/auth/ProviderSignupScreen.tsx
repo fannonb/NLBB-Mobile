@@ -9,6 +9,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
+import LegalAgreementText from '../../components/LegalAgreementText';
 import KeyboardAwareScrollView from '../../components/KeyboardAwareScrollView';
 import { Colors, Fonts, Radius } from '../../constants/theme';
 import { DEFAULT_SERVICE_CATEGORY_NAMES } from '../../constants/serviceCategories';
@@ -209,7 +210,7 @@ export default function ProviderSignupScreen({ navigation }: any) {
             <View style={styles.subNotice}>
               <Feather name="info" size={14} color={Colors.gold} />
               <Text style={styles.subNoticeText}>
-                A monthly subscription of <Text style={{ color: Colors.gold }}>Ksh 300 via M-Pesa</Text> is required to remain visible to customers.
+                A monthly subscription of <Text style={{ color: Colors.gold }}>Ksh 500 via M-Pesa</Text> is required to remain visible to customers.
               </Text>
             </View>
           </View>
@@ -218,7 +219,14 @@ export default function ProviderSignupScreen({ navigation }: any) {
         {step === 1 ? (
           <GoldButton label="Continue" onPress={handleContinue} style={styles.submitBtn} size="lg" />
         ) : (
-          <GoldButton label="Create Provider Account" onPress={handleSubmit} loading={loading} style={styles.submitBtn} size="lg" />
+          <>
+            <LegalAgreementText
+              prefix="By creating a provider account, you agree to NLBB's"
+              navigation={navigation}
+              style={styles.terms}
+            />
+            <GoldButton label="Create Provider Account" onPress={handleSubmit} loading={loading} style={styles.submitBtn} size="lg" />
+          </>
         )}
 
         {step === 2 && (
@@ -309,6 +317,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   subNoticeText: { flex: 1, color: Colors.textSecondary, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20 },
+  terms: {
+    color: Colors.textMuted,
+    fontFamily: Fonts.sans,
+    fontSize: 11,
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
   submitBtn: { width: '100%', marginBottom: 16 },
   backStepBtn: { alignItems: 'center', paddingVertical: 10 },
   backStepText: { color: Colors.textSecondary, fontFamily: Fonts.sansMedium, fontSize: 14 },

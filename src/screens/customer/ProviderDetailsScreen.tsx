@@ -24,8 +24,7 @@ import { openExternalUrl, openPhoneNumber, openWhatsAppContact } from '../../lib
 import { normalizeFacebookLink, normalizeInstagramLink } from '../../lib/socialLinks';
 import { Provider, Review } from '../../types';
 
-const FALLBACK_COVER =
-  'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
+import { coalesceImageUri, DEFAULT_PLACEHOLDER_IMAGE, isValidImageUri } from '../../lib/config';
 
 export default function ProviderDetailsScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
@@ -135,7 +134,7 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
     return (
       <View style={styles.container}>
         <View style={styles.heroContainer}>
-          <Image source={{ uri: FALLBACK_COVER }} style={styles.heroImage} />
+          <Image source={{ uri: DEFAULT_PLACEHOLDER_IMAGE }} style={styles.heroImage} />
           <View style={styles.heroOverlay} />
           <View style={[styles.topNav, { paddingTop: insets.top + 8 }]}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navBtn}>
@@ -305,7 +304,7 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
       >
         <View style={styles.heroContainer}>
           <Animated.Image
-            source={{ uri: hydratedProvider.coverImage ?? FALLBACK_COVER }}
+            source={{ uri: coalesceImageUri(hydratedProvider.coverImage) }}
             style={[
               styles.heroImage,
               {
@@ -591,7 +590,7 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
                 <View key={review.id} style={styles.reviewCard}>
                   <View style={styles.reviewHeader}>
                     <View style={styles.reviewUser}>
-                      {review.userAvatar ? (
+                      {isValidImageUri(review.userAvatar) ? (
                         <Image source={{ uri: review.userAvatar }} style={styles.reviewAvatar} />
                       ) : (
                         <View style={[styles.reviewAvatar, styles.reviewAvatarPlaceholder]}>

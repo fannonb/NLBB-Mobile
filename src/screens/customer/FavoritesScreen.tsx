@@ -11,8 +11,7 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { withProviderDistances } from '../../lib/location/providerDistance';
 import { useAppStore } from '../../store/appStore';
 
-const FALLBACK_COVER =
-  'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
+import { coalesceImageUri } from '../../lib/config';
 
 function createFavoritesStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
@@ -156,7 +155,7 @@ export default function FavoritesScreen({ navigation }: any) {
             style={styles.card}
             activeOpacity={0.85}
           >
-            <Image source={{ uri: item.coverImage ?? FALLBACK_COVER }} style={styles.img} />
+            <Image source={{ uri: coalesceImageUri(item.coverImage) }} style={styles.img} />
             <View style={styles.info}>
               <View style={styles.nameRow}>
                 <Text style={styles.name} numberOfLines={1}>{item.name}</Text>

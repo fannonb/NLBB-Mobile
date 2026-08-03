@@ -4,10 +4,13 @@ import { Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
 import LoginErrorModal from '../../components/LoginErrorModal';
 import { AuthScreenLayout, NLBBButton, NLBBInput, NLBBCard } from '../../components/ui';
+import LegalAgreementText from '../../components/LegalAgreementText';
 import { ColorPalette, Fonts } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
 import { getDemoCredentialsHint } from '../../lib/demo/demoSession';
 import { ENABLE_DEMO_MODE } from '../../lib/demo/config';
+
+const showDemoLogin = __DEV__ && ENABLE_DEMO_MODE;
 
 export default function LoginScreen({ navigation, route }: any) {
   const palette = useThemedColors();
@@ -116,7 +119,7 @@ export default function LoginScreen({ navigation, route }: any) {
             <Text style={styles.promoText}>
               Verified beauty and wellness professionals across Kenya.
             </Text>
-            {ENABLE_DEMO_MODE ? (
+            {showDemoLogin ? (
               <View style={styles.demoBox}>
                 <Text style={styles.demoLabel}>Try demo mode (offline)</Text>
                 <Text style={styles.demoHint}>Provider: {getDemoCredentialsHint('provider')}</Text>
@@ -213,11 +216,7 @@ export default function LoginScreen({ navigation, route }: any) {
 
           <NLBBButton label="Sign In" onPress={handleLogin} loading={loading} size="lg" style={styles.loginBtn} />
 
-          <Text style={styles.terms}>
-            By continuing, you agree to NLBB's{' '}
-            <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-            <Text style={styles.termsLink}>Privacy Policy</Text>.
-          </Text>
+          <LegalAgreementText navigation={navigation} style={styles.terms} />
 
           <View style={styles.signupRow}>
             <Text style={styles.signupText}>Don't have an account? </Text>

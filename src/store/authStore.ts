@@ -44,6 +44,7 @@ interface AuthState {
   ) => Promise<{ success: boolean; role: UserRole | null; error?: string }>;
   signupCustomer: (payload: SignupPayload) => Promise<{ success: boolean; error?: string }>;
   signupProvider: (payload: SignupPayload) => Promise<{ success: boolean; error?: string }>;
+  deleteAccount: (password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
 }
 
@@ -460,6 +461,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           : error instanceof Error
             ? error.message
             : 'Unable to create provider account. Please try again.';
+      return { success: false, error: message };
+    }
+  },
+
+  deleteAccount: async (password: string) => {
+    try {
+      await authApi.deleteAccount({ password });
+      lastUserRefreshAt = 0;
+      set({ user: null, isLoggedIn: false, isInitializing: false, isReady: true, authNotice: null });
+      resetSignedOutState();
+      await clearStoredAuth();
+      return { success: true };
+    } catch (error) {
+      const message =
+        isApiClientError(error)
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Could not delete your account. Please try again.';
       return { success: false, error: message };
     }
   },

@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
-import { resolveImageUrl } from '../../lib/config';
+import { isValidImageUri, resolveImageUrl } from '../../lib/config';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import ConfirmModal from '../../components/ConfirmModal';
 import InfoModal from '../../components/InfoModal';
@@ -260,7 +260,7 @@ export default function AppointmentDetailScreen({ navigation, route }: any) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Customer</Text>
           <View style={styles.customerRow}>
-            {appointment.customerImg ? (
+            {isValidImageUri(appointment.customerImg) ? (
               <Image source={{ uri: resolveImageUrl(appointment.customerImg) }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>

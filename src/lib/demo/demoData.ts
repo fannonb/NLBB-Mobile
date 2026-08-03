@@ -451,7 +451,7 @@ export const createProviderDemoNotifications = (): Notification[] => [
   {
     id: 'pnotif-3',
     title: 'Payment received',
-    body: 'M-Pesa subscription payment of Ksh 300 confirmed.',
+    body: 'M-Pesa subscription payment of Ksh 500 confirmed.',
     type: 'payment',
     isRead: true,
     createdAt: atTime(-3, 11, 0),
@@ -470,7 +470,7 @@ export const DEMO_SUBSCRIPTION: Subscription = {
   providerId: DEMO_SHOP_ID,
   status: 'active',
   renewalDate: atTime(28, 0, 0),
-  amount: 300,
+  amount: 500,
   paymentMethod: 'mpesa',
   lastPaymentId: 'pay-001',
   updatedAt: atTime(-2, 0, 0),
@@ -480,7 +480,7 @@ export const DEMO_PAYMENTS: Payment[] = [
   {
     id: 'pay-001',
     providerId: DEMO_SHOP_ID,
-    amount: 300,
+    amount: 500,
     phoneNumber: '+254723456789',
     method: 'mpesa',
     status: 'success',
@@ -493,7 +493,7 @@ export const DEMO_PAYMENTS: Payment[] = [
   {
     id: 'pay-002',
     providerId: DEMO_SHOP_ID,
-    amount: 300,
+    amount: 500,
     phoneNumber: '+254723456789',
     method: 'mpesa',
     status: 'success',

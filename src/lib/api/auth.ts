@@ -169,4 +169,6 @@ export const authApi = {
   /** Complete the reset: exchange OTP token + new password (used from deep link flow). */
   resetPassword: (payload: { token: string; newPassword: string }) =>
     requestAuth<{ reset: boolean }>('auth/reset-password', payload),
+  deleteAccount: (payload: { password: string }) =>
+    apiClient.post<{ deleted: boolean }>('auth/delete-account', payload),
 };

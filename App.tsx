@@ -18,6 +18,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { navigateFromNotificationPayload } from './src/lib/notificationNavigation';
 import {
   PushNotificationPayload,
+  hasRegisteredPushToken,
   registerForPushNotificationsAsync,
   subscribeToPushNotifications,
 } from './src/lib/push';
@@ -237,6 +238,9 @@ export default function App() {
     void registerForPushNotificationsAsync();
 
     const poll = setInterval(() => {
+      if (!hasRegisteredPushToken()) {
+        void registerForPushNotificationsAsync();
+      }
       void pollNotificationsForSignedInUser();
     }, 20_000);
 

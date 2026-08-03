@@ -10,7 +10,7 @@ import SectionHeader from '../../components/SectionHeader';
 import Toast from '../../components/Toast';
 import { useAppStore } from '../../store/appStore';
 import { useBookingDataStore } from '../../store/bookingDataStore';
-import { resolveImageUrl } from '../../lib/config';
+import { isValidImageUri, resolveImageUrl } from '../../lib/config';
 import { toProviderAppointmentCard } from '../../lib/api/bookings';
 import { isApiClientError } from '../../lib/api/client';
 import { providerManagementApi } from '../../lib/api/providerManagement';
@@ -646,7 +646,7 @@ export default function DashboardScreen({ navigation }: any) {
           <View style={styles.nextUpCard}>
             <Text style={styles.nextUpLabel}>Next confirmed booking</Text>
             <View style={styles.nextUpRow}>
-              {nextUp.customerImg ? (
+              {isValidImageUri(nextUp.customerImg) ? (
                 <Image source={{ uri: resolveImageUrl(nextUp.customerImg) }} style={styles.nextUpAvatar} />
               ) : (
                 <View style={[styles.nextUpAvatar, styles.nextUpAvatarPlaceholder]}>
@@ -749,7 +749,7 @@ export default function DashboardScreen({ navigation }: any) {
                   activeOpacity={0.85}
                   onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: apt.id })}
                 >
-                  {apt.customerImg ? (
+                  {isValidImageUri(apt.customerImg) ? (
                     <Image source={{ uri: resolveImageUrl(apt.customerImg) }} style={styles.confirmedAvatar} />
                   ) : (
                     <View style={[styles.confirmedAvatar, styles.confirmedAvatarPlaceholder]}>
@@ -818,7 +818,7 @@ export default function DashboardScreen({ navigation }: any) {
                 style={styles.todayCard}
                 onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: apt.id })}
               >
-                {apt.customerImg ? (
+                {isValidImageUri(apt.customerImg) ? (
                   <Image source={{ uri: resolveImageUrl(apt.customerImg) }} style={styles.todayAvatar} />
                 ) : (
                   <View style={[styles.todayAvatar, styles.todayAvatarPlaceholder]}>
@@ -859,7 +859,7 @@ export default function DashboardScreen({ navigation }: any) {
               >
                 <View style={styles.reqHeader}>
                   <View style={styles.reqUser}>
-                    {req.customerImg ? (
+                    {isValidImageUri(req.customerImg) ? (
                       <Image source={{ uri: resolveImageUrl(req.customerImg) }} style={styles.reqAvatar} />
                     ) : (
                       <View style={[styles.reqAvatar, styles.reqAvatarPlaceholder]}>

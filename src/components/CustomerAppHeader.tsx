@@ -5,6 +5,8 @@ import { ColorPalette, Fonts, ShadowPalette } from '../constants/theme';
 import { useThemedColors, useThemedShadows } from '../hooks/useThemedColors';
 import { useAuthStore } from '../store/authStore';
 
+import { isValidImageUri } from '../lib/config';
+
 const getInitials = (name?: string) => {
   if (!name) return 'U';
   const parts = name.trim().split(/\s+/);
@@ -228,7 +230,7 @@ export default function CustomerAppHeader({
           <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.85} style={styles.avatarBtn}>
             <View style={styles.avatar}>
               {isLoggedIn ? (
-                user?.avatar ? (
+                user?.avatar && isValidImageUri(user.avatar) ? (
                   <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
                 ) : (
                   <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>

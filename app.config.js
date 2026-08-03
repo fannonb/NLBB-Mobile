@@ -7,6 +7,8 @@ const googleMapsApiKey =
   '';
 const googleServicesFilePath = path.join(__dirname, 'google-services.json');
 const hasGoogleServicesFile = fs.existsSync(googleServicesFilePath);
+const appEnv = (process.env.EXPO_PUBLIC_APP_ENV ?? 'development').trim().toLowerCase();
+const isProduction = appEnv === 'production';
 
 module.exports = {
   expo: {
@@ -38,7 +40,7 @@ module.exports = {
     android: {
       package: 'com.nlbb.mobile',
       versionCode: 1,
-      usesCleartextTraffic: true,
+      usesCleartextTraffic: !isProduction,
       ...(hasGoogleServicesFile ? { googleServicesFile: './google-services.json' } : {}),
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',

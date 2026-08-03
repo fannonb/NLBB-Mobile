@@ -28,8 +28,7 @@ import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { Provider } from '../../types';
 
-const FALLBACK_COVER =
-  'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
+import { coalesceImageUri } from '../../lib/config';
 
 function createExploreStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
@@ -109,7 +108,7 @@ function ProviderListCard({
 }) {
   return (
     <TouchableOpacity onPress={onPress} style={styles.listCard} activeOpacity={0.85}>
-      <Image source={{ uri: provider.coverImage ?? FALLBACK_COVER }} style={styles.listImg} />
+      <Image source={{ uri: coalesceImageUri(provider.coverImage) }} style={styles.listImg} />
       <View style={styles.listInfo}>
         <View style={styles.listTop}>
           <Text style={styles.listName} numberOfLines={1}>{provider.name}</Text>

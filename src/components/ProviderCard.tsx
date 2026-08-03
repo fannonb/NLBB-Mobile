@@ -11,10 +11,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../constants/theme';
 import { getCategoryVisual } from '../constants/categoryVisuals';
 import { useThemedColors, useThemedShadows } from '../hooks/useThemedColors';
+import { coalesceImageUri } from '../lib/config';
 import { Provider } from '../types';
-
-const FALLBACK_COVER =
-  'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
 
 interface ProviderCardProps {
   provider: Provider;
@@ -228,7 +226,7 @@ export default function ProviderCard({
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={styles.card}>
       <View style={styles.imageContainer}>
-        <Image source={{ uri: provider.coverImage ?? FALLBACK_COVER }} style={styles.image} />
+        <Image source={{ uri: coalesceImageUri(provider.coverImage) }} style={styles.image} />
 
         {/* Availability badge */}
         <View style={styles.availBadge}>

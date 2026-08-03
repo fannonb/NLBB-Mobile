@@ -33,6 +33,9 @@ import { useAppStore, ProviderProfile, WorkingHours } from '../../store/appStore
 import Toast from '../../components/Toast';
 import ChangePasswordModal, { ChangePasswordResult } from '../../components/ChangePasswordModal';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
+import LegalLinksSection from '../../components/LegalLinksSection';
+import AccountDangerZone from '../../components/AccountDangerZone';
+import DeleteAccountModal from '../../components/DeleteAccountModal';
 import ActionSheetModal, { ActionSheetOption } from '../../components/ActionSheetModal';
 import { useModalManager } from '../../hooks/useModalManager';
 import { Category, Provider } from '../../types';
@@ -261,6 +264,7 @@ export default function ProviderProfileScreen({ navigation }: any) {
   const styles = useMemo(() => createProfileStyles(palette, shadow), [palette, shadow]);
   const fStyles = useMemo(() => fieldStyles(palette), [palette]);
   const logout = useAuthStore((s) => s.logout);
+  const deleteAccount = useAuthStore((s) => s.deleteAccount);
   const user = useAuthStore((s) => s.user);
   const refreshCurrentUser = useAuthStore((s) => s.refreshCurrentUser);
   const updateProviderProfile = useAppStore((s) => s.updateProviderProfile);
@@ -280,6 +284,7 @@ export default function ProviderProfileScreen({ navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [changePasswordVisible, setChangePasswordVisible] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
   const [ownerName, setOwnerName] = useState('');
   const [accountEmail, setAccountEmail] = useState('');
   const [lastSavedOwnerName, setLastSavedOwnerName] = useState('');
@@ -1175,21 +1180,25 @@ export default function ProviderProfileScreen({ navigation }: any) {
                 </TouchableOpacity>
               ) : null}
             </>
-          ) : null}
+              ) : null}
 
+              {!isEditing ? <LegalLinksSection navigation={navigation} /> : null}
 
+              {!isEditing ? (
+                <AccountDangerZone role="provider" onDeletePress={() => setDeleteVisible(true)} />
+              ) : null}
 
-          {!isEditing ? (
-            <TouchableOpacity
-              onPress={async () => {
-                await logout();
-              }}
-              style={styles.logoutBtn}
-            >
-              <Feather name="log-out" size={18} color={palette.error} />
-              <Text style={styles.logoutText}>Log Out</Text>
-            </TouchableOpacity>
-          ) : null}
+              {!isEditing ? (
+                <TouchableOpacity
+                  onPress={async () => {
+                    await logout();
+                  }}
+                  style={styles.logoutBtn}
+                >
+                  <Feather name="log-out" size={18} color={palette.error} />
+                  <Text style={styles.logoutText}>Log Out</Text>
+                </TouchableOpacity>
+              ) : null}
         </View>
       </KeyboardAwareScrollView>
 
@@ -1225,6 +1234,20 @@ export default function ProviderProfileScreen({ navigation }: any) {
         onChangePassword={handleChangePassword}
         onSuccess={showSuccess}
         onError={showError}
+      />
+
+      <DeleteAccountModal
+        visible={deleteVisible}
+        role="provider"
+        onDismiss={() => setDeleteVisible(false)}
+        onDeleteAccount={deleteAccount}
+        onSuccess={() => {
+          setDeleteVisible(false);
+          navigation.getParent()?.reset({
+            index: 0,
+            routes: [{ name: 'Login', params: { role: 'provider' } }],
+          });
+        }}
       />
 
       <FeedbackModalHost modal={modal} onDismiss={hideModal} />

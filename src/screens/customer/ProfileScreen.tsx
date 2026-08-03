@@ -9,12 +9,16 @@ import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { useAuthStore } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import CustomerAppHeader from '../../components/CustomerAppHeader';
+import LegalLinksSection from '../../components/LegalLinksSection';
+import AccountDangerZone from '../../components/AccountDangerZone';
+import DeleteAccountModal from '../../components/DeleteAccountModal';
 import ActionSheetModal, { ActionSheetOption } from '../../components/ActionSheetModal';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
 import { useModalManager } from '../../hooks/useModalManager';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useProviderDirectory } from '../../hooks/useProviderDirectory';
 import { useAuthGateStore } from '../../store/authGateStore';
+import { coalesceImageUri } from '../../lib/config';
 import { toCustomerBookingCard } from '../../lib/api/bookings';
 import { authApi } from '../../lib/api/auth';
 import { isApiClientError } from '../../lib/api/client';
@@ -228,7 +232,7 @@ export default function ProfileScreen({ navigation }: any) {
   const palette = useThemedColors();
   const shadow = useThemedShadows();
   const styles = useMemo(() => createProfileStyles(palette, shadow), [palette, shadow]);
-  const { logout, user, refreshCurrentUser } = useAuthStore();
+  const { logout, deleteAccount, user, refreshCurrentUser } = useAuthStore();
   const { isLoggedIn, requireAuth } = useRequireAuth();
   const openAuthGate = useAuthGateStore((state) => state.open);
   const { customerNotifications, favorites, hydrateFavorites, hydrateCustomerNotifications } = useAppStore();
@@ -239,6 +243,7 @@ export default function ProfileScreen({ navigation }: any) {
   const { providers, loading: providersLoading } = useProviderDirectory();
   const [favoritesLoading, setFavoritesLoading] = useState(isLoggedIn);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
   const recentBooking = useMemo(
     () => (isLoggedIn && bookingRecords[0] ? toCustomerBookingCard(bookingRecords[0]) : null),
     [bookingRecords, isLoggedIn]
@@ -471,7 +476,7 @@ export default function ProfileScreen({ navigation }: any) {
                   activeOpacity={0.85}
                 >
                   <View style={styles.favImgWrap}>
-                    <Image source={{ uri: provider.coverImage }} style={styles.favImg} />
+                    <Image source={{ uri: coalesceImageUri(provider.coverImage) }} style={styles.favImg} />
                     <View style={styles.favHeart}>
                       <Feather name="heart" size={12} color={palette.gold} />
                     </View>
@@ -550,7 +555,27 @@ export default function ProfileScreen({ navigation }: any) {
         </TouchableOpacity>
           </>
         )}
+
+        {isLoggedIn ? (
+          <AccountDangerZone role="customer" onDeletePress={() => setDeleteVisible(true)} />
+        ) : null}
+
+        <LegalLinksSection navigation={navigation} />
       </ScrollView>
+
+      <DeleteAccountModal
+        visible={deleteVisible}
+        role="customer"
+        onDismiss={() => setDeleteVisible(false)}
+        onDeleteAccount={deleteAccount}
+        onSuccess={() => {
+          setDeleteVisible(false);
+          navigation.getParent()?.reset({
+            index: 0,
+            routes: [{ name: 'CustomerApp' }],
+          });
+        }}
+      />
     </View>
   );
 }

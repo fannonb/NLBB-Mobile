@@ -164,6 +164,8 @@ export type RootStackParamList = {
   EditProfile: undefined;
   DarkMode: undefined;
   NotificationSettings: undefined;
+  TermsOfService: undefined;
+  PrivacyPolicy: undefined;
   ProviderApp: undefined;
   AppointmentDetail: { appointmentId: string };
   ProviderReviews: undefined;

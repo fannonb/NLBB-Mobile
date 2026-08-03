@@ -103,10 +103,16 @@ const getApiOrigin = () => {
   }
 };
 
+export const DEFAULT_PLACEHOLDER_IMAGE =
+  'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop';
+
+export const isValidImageUri = (value?: string | null): value is string => Boolean(value?.trim());
+
 export const resolveImageUrl = (value: string | null | undefined, fallback?: string): string => {
   const trimmed = value?.trim();
+  const fallbackTrimmed = fallback?.trim();
   if (!trimmed) {
-    return fallback ?? '';
+    return fallbackTrimmed ?? '';
   }
 
   if (/^(?:data:|file:|content:)/i.test(trimmed)) {
@@ -153,4 +159,17 @@ export const resolveImageUrl = (value: string | null | undefined, fallback?: str
   }
 
   return trimmed;
+};
+
+export const coalesceImageUri = (
+  value: string | null | undefined,
+  fallback: string = DEFAULT_PLACEHOLDER_IMAGE
+): string => {
+  const resolved = resolveImageUrl(value);
+  return isValidImageUri(resolved) ? resolved : fallback;
+};
+
+export const resolveOptionalImageUrl = (value: string | null | undefined): string | undefined => {
+  const resolved = resolveImageUrl(value);
+  return isValidImageUri(resolved) ? resolved : undefined;
 };

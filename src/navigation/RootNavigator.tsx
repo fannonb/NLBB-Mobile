@@ -45,6 +45,8 @@ const WriteReviewScreen = lazyScreen(() => require('../screens/customer/WriteRev
 const EditProfileScreen = lazyScreen(() => require('../screens/customer/EditProfileScreen'));
 const DarkModeScreen = lazyScreen(() => require('../screens/customer/DarkModeScreen'));
 const NotificationSettingsScreen = lazyScreen(() => require('../screens/customer/NotificationSettingsScreen'));
+const TermsOfServiceScreen = lazyScreen(() => require('../screens/legal/TermsOfServiceScreen'));
+const PrivacyPolicyScreen = lazyScreen(() => require('../screens/legal/PrivacyPolicyScreen'));
 
 const AppointmentDetailScreen = lazyScreen(() => require('../screens/provider/AppointmentDetailScreen'));
 const ProviderReviewsScreen = lazyScreen(() => require('../screens/provider/ProviderReviewsScreen'));
@@ -173,6 +175,8 @@ export default function RootNavigator() {
         <Stack.Screen name="EditProfile" component={GuardedEditProfileScreen} />
         <Stack.Screen name="DarkMode" component={GuardedDarkModeScreen} />
         <Stack.Screen name="NotificationSettings" component={GuardedNotificationSettingsScreen} />
+        <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
 
         <Stack.Screen name="ProviderApp" component={GuardedProviderTabNavigator} />
         <Stack.Screen name="AppointmentDetail" component={GuardedAppointmentDetailScreen} />

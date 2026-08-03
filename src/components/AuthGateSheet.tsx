@@ -17,6 +17,7 @@ import { navigate } from '../lib/navigationRef';
 import InputFocusWrap from './InputFocusWrap';
 import LoginErrorModal from './LoginErrorModal';
 import KeyboardAwareSheet from './KeyboardAwareSheet';
+import LegalAgreementText from './LegalAgreementText';
 
 type AuthMode = 'login' | 'signup';
 type LoginErrorType = 'invalid_credentials' | 'empty_fields';
@@ -443,9 +444,7 @@ export default function AuthGateSheet() {
           <Text style={styles.providerLinkText}>I'm a service provider</Text>
         </TouchableOpacity>
 
-        <Text style={styles.terms}>
-          By continuing you agree to NLBB Terms of Service and Privacy Policy.
-        </Text>
+        <LegalAgreementText style={styles.terms} />
       </KeyboardAwareSheet>
 
       <LoginErrorModal

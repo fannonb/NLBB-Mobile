@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
 import ErrorModal from '../../components/ErrorModal';
 import { AuthScreenLayout, NLBBButton, NLBBInput, NLBBCard } from '../../components/ui';
+import LegalAgreementText from '../../components/LegalAgreementText';
 import { ColorPalette, Fonts } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
 
@@ -104,11 +105,11 @@ export default function SignupScreen({ navigation }: any) {
             />
           </View>
 
-          <Text style={styles.terms}>
-            By signing up, you agree to NLBB's{' '}
-            <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-            <Text style={styles.termsLink}>Privacy Policy</Text>
-          </Text>
+          <LegalAgreementText
+            prefix="By signing up, you agree to NLBB's"
+            navigation={navigation}
+            style={styles.terms}
+          />
 
           <NLBBButton label="Create Account" onPress={handleSignup} loading={loading} size="lg" style={styles.submitBtn} />
 

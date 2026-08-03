@@ -1,5 +1,5 @@
 import { Provider, Review } from '../types';
-import { resolveImageUrl } from './config';
+import { coalesceImageUri, isValidImageUri, resolveImageUrl } from './config';
 
 type AvatarRecord = {
   avatar?: string | null;
@@ -13,28 +13,22 @@ type BookingImageRecord = {
 const normalizeImageList = (images?: Array<string | null | undefined>) =>
   (images ?? [])
     .map((image) => resolveImageUrl(image))
-    .filter((image): image is string => Boolean(image));
+    .filter((image): image is string => isValidImageUri(image));
 
 const normalizeAvatarValue = (avatar: string | null | undefined) => {
   const resolved = resolveImageUrl(avatar);
-  if (resolved) {
-    return resolved;
-  }
-  return avatar;
+  return isValidImageUri(resolved) ? resolved : undefined;
 };
 
 const normalizeImageValue = (value: string | null | undefined) => {
   const resolved = resolveImageUrl(value);
-  if (resolved) {
-    return resolved;
-  }
-  return value;
+  return isValidImageUri(resolved) ? resolved : undefined;
 };
 
 export const normalizeProviderMedia = (provider: Provider): Provider => ({
   ...provider,
-  avatar: resolveImageUrl(provider.avatar),
-  coverImage: resolveImageUrl(provider.coverImage),
+  avatar: normalizeAvatarValue(provider.avatar),
+  coverImage: coalesceImageUri(provider.coverImage),
   images: normalizeImageList(provider.images),
   galleryImages: normalizeImageList(provider.galleryImages),
 });

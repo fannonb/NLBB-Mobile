@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
-import { resolveImageUrl } from '../../lib/config';
+import { isValidImageUri, resolveImageUrl } from '../../lib/config';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import EmptyState from '../../components/EmptyState';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -372,7 +372,7 @@ function AppointmentCard({
       </View>
 
       <View style={styles.customerRow}>
-        {apt.customerImg ? (
+        {isValidImageUri(apt.customerImg) ? (
           <Image source={{ uri: resolveImageUrl(apt.customerImg) }} style={styles.customerAvatar} />
         ) : (
           <View style={[styles.customerAvatar, styles.customerAvatarPlaceholder]}>

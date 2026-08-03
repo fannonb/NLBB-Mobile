@@ -25,6 +25,7 @@ import { useOpenBooking } from '../../hooks/useOpenBooking';
 import { providerApi } from '../../lib/api/providers';
 import { toCustomerBookingCard } from '../../lib/api/bookings';
 import { withProviderDistances } from '../../lib/location/providerDistance';
+import { coalesceImageUri, isValidImageUri } from '../../lib/config';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useBookingDataStore } from '../../store/bookingDataStore';
@@ -495,7 +496,7 @@ export default function HomeScreen({ navigation }: any) {
                   activeOpacity={0.85}
                 >
                   <View style={styles.bookAgainRing}>
-                    {item.providerImage ? (
+                    {isValidImageUri(item.providerImage) ? (
                       <Image source={{ uri: item.providerImage }} style={styles.bookAgainImg} />
                     ) : (
                       <View style={styles.bookAgainPlaceholder}>
@@ -664,7 +665,7 @@ export default function HomeScreen({ navigation }: any) {
                   onPress={() => navigation.navigate('ProviderDetails', { providerId: fav.id })}
                 >
                   <View style={styles.favRingActive}>
-                    <Image source={{ uri: fav.coverImage }} style={styles.favImg} />
+                    <Image source={{ uri: coalesceImageUri(fav.coverImage) }} style={styles.favImg} />
                   </View>
                   <Text style={styles.favName} numberOfLines={1}>{fav.name}</Text>
                 </TouchableOpacity>
