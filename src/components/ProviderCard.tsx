@@ -14,11 +14,13 @@ import ProviderCoverImage from './ProviderCoverImage';
 import { formatRatingSummary } from '../lib/ratingLabel';
 import { Provider } from '../types';
 
+// Handlers receive the provider id so lists can pass one stable callback for every card,
+// which lets React.memo skip re-rendering cards whose data didn't change.
 interface ProviderCardProps {
   provider: Provider;
-  onPress: () => void;
-  onBookPress?: () => void;
-  onFavoritePress?: () => void;
+  onPress: (providerId: string) => void;
+  onBookPress?: (providerId: string) => void;
+  onFavoritePress?: (providerId: string) => void;
   isFavorited?: boolean;
 }
 
@@ -203,7 +205,7 @@ function createProviderCardStyles(p: ColorPalette, s: ShadowPalette) {
   });
 }
 
-export default function ProviderCard({
+function ProviderCard({
   provider,
   onPress,
   onBookPress,
@@ -221,7 +223,7 @@ export default function ProviderCard({
   const reviewLabel = formatRatingSummary(provider.rating, provider.reviewCount);
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={styles.card}>
+    <TouchableOpacity onPress={() => onPress(provider.id)} activeOpacity={0.9} style={styles.card}>
       <View style={styles.imageContainer}>
         <ProviderCoverImage uri={provider.coverImage} category={provider.category} style={styles.image} iconSize={40} />
 
@@ -238,7 +240,7 @@ export default function ProviderCard({
 
         {/* Favourite button */}
         <TouchableOpacity
-          onPress={onFavoritePress}
+          onPress={onFavoritePress ? () => onFavoritePress(provider.id) : undefined}
           style={styles.favBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
@@ -290,7 +292,11 @@ export default function ProviderCard({
             <Text style={styles.priceLabel}>Starts from</Text>
             <Text style={styles.price}>Ksh {provider.priceFrom.toLocaleString()}</Text>
           </View>
-          <TouchableOpacity onPress={onBookPress} style={styles.bookBtn} activeOpacity={0.85}>
+          <TouchableOpacity
+            onPress={onBookPress ? () => onBookPress(provider.id) : undefined}
+            style={styles.bookBtn}
+            activeOpacity={0.85}
+          >
             <Text style={styles.bookText}>Book</Text>
           </TouchableOpacity>
         </View>
@@ -298,3 +304,5 @@ export default function ProviderCard({
     </TouchableOpacity>
   );
 }
+
+export default React.memo(ProviderCard);

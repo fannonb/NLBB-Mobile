@@ -20,6 +20,7 @@ import { useModalManager } from '../../hooks/useModalManager';
 import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../lib/api/auth';
 import { providerManagementApi } from '../../lib/api/providerManagement';
+import { useShallow } from 'zustand/react/shallow';
 
 const toggleCategory = (selected: string[], category: string) =>
   selected.includes(category)
@@ -38,7 +39,7 @@ export default function ProviderSignupScreen({ navigation }: any) {
   const [selectedLocation, setSelectedLocation] = useState<PickedProviderLocation | null>(null);
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signupProvider } = useAuthStore();
+  const { signupProvider } = useAuthStore(useShallow((state) => ({ signupProvider: state.signupProvider })));
   const { modal, showError, showInfo, hideModal } = useModalManager();
 
   const handleContinue = () => {

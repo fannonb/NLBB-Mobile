@@ -8,6 +8,7 @@ import LegalAgreementText from '../../components/LegalAgreementText';
 import { ColorPalette, Fonts } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
 import { ENABLE_DEMO_MODE } from '../../lib/demo/config';
+import { useShallow } from 'zustand/react/shallow';
 
 const showDemoLogin = __DEV__ && ENABLE_DEMO_MODE;
 
@@ -29,7 +30,7 @@ export default function LoginScreen({ navigation, route }: any) {
   const [errorTitle, setErrorTitle] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [errorHint, setErrorHint] = useState<string | undefined>(undefined);
-  const { login, consumeAuthNotice } = useAuthStore();
+  const { login, consumeAuthNotice } = useAuthStore(useShallow((state) => ({ login: state.login, consumeAuthNotice: state.consumeAuthNotice })));
 
   useEffect(() => {
     setRole(requestedRole);

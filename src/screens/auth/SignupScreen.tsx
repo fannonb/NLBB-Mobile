@@ -7,6 +7,7 @@ import { AuthScreenLayout, NLBBButton, NLBBInput, NLBBCard } from '../../compone
 import LegalAgreementText from '../../components/LegalAgreementText';
 import { ColorPalette, Fonts } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function SignupScreen({ navigation }: any) {
   const palette = useThemedColors();
@@ -20,7 +21,7 @@ export default function SignupScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [errorVisible, setErrorVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const { signupCustomer } = useAuthStore();
+  const { signupCustomer } = useAuthStore(useShallow((state) => ({ signupCustomer: state.signupCustomer })));
 
   const showError = (message: string) => {
     setErrorMessage(message);

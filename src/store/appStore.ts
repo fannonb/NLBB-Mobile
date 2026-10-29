@@ -7,6 +7,8 @@ import { favoritesApi } from '../lib/api/favorites';
 import { notificationsApi } from '../lib/api/notifications';
 import { DEFAULT_NOTIFICATION_SETTINGS, NotificationSettings } from '../lib/api/preferences';
 
+const sameSerialized = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
+
 export interface WorkingHours {
   day: string;
   isOpen: boolean;
@@ -354,8 +356,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         const notifications = await notificationsApi.listMyNotifications();
         if (startedAtVersion === customerNotificationsMutationVersion) {
-          set({ customerNotifications: notifications });
-          void persistAccountSnapshot(CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY, notifications);
+          // The 20s poll usually returns the same list; skip the store write (which
+          // re-renders every subscribed screen) and the storage write when unchanged.
+          if (!sameSerialized(get().customerNotifications, notifications)) {
+            set({ customerNotifications: notifications });
+            void persistAccountSnapshot(CUSTOMER_NOTIFICATIONS_SNAPSHOT_KEY, notifications);
+          }
           lastCustomerNotificationsHydratedAt = Date.now();
         }
       } catch {
@@ -461,8 +467,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         const notifications = await notificationsApi.listMyNotifications();
         if (startedAtVersion === providerNotificationsMutationVersion) {
           const nextNotifications = notifications.map(toProviderNotification);
-          set({ providerNotifications: nextNotifications });
-          void persistAccountSnapshot(PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY, nextNotifications);
+          if (!sameSerialized(get().providerNotifications, nextNotifications)) {
+            set({ providerNotifications: nextNotifications });
+            void persistAccountSnapshot(PROVIDER_NOTIFICATIONS_SNAPSHOT_KEY, nextNotifications);
+          }
           lastProviderNotificationsHydratedAt = Date.now();
         }
       } catch {

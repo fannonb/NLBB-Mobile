@@ -30,6 +30,7 @@ import { Provider, Review } from '../../types';
 
 import { coalesceImageUri, DEFAULT_PLACEHOLDER_IMAGE, isValidImageUri } from '../../lib/config';
 import { formatReviewCount } from '../../lib/ratingLabel';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function ProviderDetailsScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
@@ -38,7 +39,7 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
   const styles = useMemo(() => createProviderDetailsStyles(palette, shadow), [palette, shadow]);
   const currentLocation = useCurrentDeviceLocationState();
   const { providerId } = route.params ?? { providerId: '1' };
-  const { favorites, toggleFavorite } = useAppStore();
+  const { favorites, toggleFavorite } = useAppStore(useShallow((state) => ({ favorites: state.favorites, toggleFavorite: state.toggleFavorite })));
   const { isLoggedIn, requireAuth } = useRequireAuth();
   const { openBooking } = useOpenBooking();
   const { modal, showError, showInfo, hideModal } = useModalManager();

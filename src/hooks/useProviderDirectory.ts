@@ -14,7 +14,8 @@ type ProviderDirectoryState = {
   error: string | null;
 };
 
-const REFRESH_INTERVAL_MS = 15_000;
+// Tab focus refetches at most once a minute; app resume always refetches (see below).
+const REFRESH_INTERVAL_MS = 60_000;
 
 let sharedState: ProviderDirectoryState = {
   providers: [],
@@ -27,6 +28,9 @@ let sharedState: ProviderDirectoryState = {
 
 let inFlightLoad: Promise<void> | null = null;
 const listeners = new Set<(state: ProviderDirectoryState) => void>();
+let appStateSubscription: { remove: () => void } | null = null;
+
+const sameSerialized = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
 
 const prefetchProviderImages = (providers: Provider[]) => {
   const urls = new Set<string>();
@@ -56,26 +60,41 @@ export const loadProviderDirectory = async (options: { force?: boolean } = {}) =
     return;
   }
 
-  if (inFlightLoad && !options.force) {
+  // A request already on the wire answers forced refreshes too; several screens and the
+  // resume handler often ask at the same moment.
+  if (inFlightLoad) {
     return inFlightLoad;
   }
 
   const request = (async () => {
-    emitState({
-      loading: !hasWarmData,
-      refreshing: hasWarmData,
-      error: null,
-    });
+    // Background refreshes stay silent: only the very first load shows a loading state,
+    // so mounted screens don't re-render twice per refresh.
+    if (!hasWarmData && !sharedState.loading) {
+      emitState({ loading: true, error: null });
+    }
 
     try {
-      const [providers, categories] = await Promise.all([
+      const [providers, fetchedCategories] = await Promise.all([
         providerApi.listProviders({}, { force: options.force }),
         providerApi.listCategories({ force: options.force }),
       ]);
+      const categories = mergeCategoriesWithDefaults(fetchedCategories);
+
+      const unchanged =
+        hasWarmData &&
+        !sharedState.loading &&
+        sharedState.error === null &&
+        sameSerialized(sharedState.providers, providers) &&
+        sameSerialized(sharedState.categories, categories);
+
+      if (unchanged) {
+        sharedState = { ...sharedState, loadedAt: Date.now() };
+        return;
+      }
 
       emitState({
         providers,
-        categories: mergeCategoriesWithDefaults(categories),
+        categories,
         loading: false,
         refreshing: false,
         loadedAt: Date.now(),
@@ -105,20 +124,25 @@ export const useProviderDirectory = () => {
 
   useEffect(() => {
     listeners.add(setState);
+    setState(sharedState);
     void loadProviderDirectory();
 
-    const onAppStateChange = (nextState: AppStateStatus) => {
-      if (nextState === 'active') {
-        // Always re-fetch on resume so unpaid providers do not linger after payment.
-        void loadProviderDirectory({ force: true });
-      }
-    };
-
-    const subscription = AppState.addEventListener('change', onAppStateChange);
+    // One resume listener for the whole directory, not one per mounted screen.
+    if (!appStateSubscription) {
+      appStateSubscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+        if (nextState === 'active') {
+          // Always re-fetch on resume so unpaid providers do not linger after payment.
+          void loadProviderDirectory({ force: true });
+        }
+      });
+    }
 
     return () => {
       listeners.delete(setState);
-      subscription.remove();
+      if (listeners.size === 0 && appStateSubscription) {
+        appStateSubscription.remove();
+        appStateSubscription = null;
+      }
     };
   }, []);
 

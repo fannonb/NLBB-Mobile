@@ -27,6 +27,7 @@ import { toCustomerBookingCard } from '../../lib/api/bookings';
 import { authApi } from '../../lib/api/auth';
 import { isApiClientError } from '../../lib/api/client';
 import { useBookingDataStore } from '../../store/bookingDataStore';
+import { useShallow } from 'zustand/react/shallow';
 
 
 
@@ -236,10 +237,10 @@ export default function ProfileScreen({ navigation }: any) {
   const palette = useThemedColors();
   const shadow = useThemedShadows();
   const styles = useMemo(() => createProfileStyles(palette, shadow), [palette, shadow]);
-  const { logout, deleteAccount, user, refreshCurrentUser } = useAuthStore();
+  const { logout, deleteAccount, user, refreshCurrentUser } = useAuthStore(useShallow((state) => ({ logout: state.logout, deleteAccount: state.deleteAccount, user: state.user, refreshCurrentUser: state.refreshCurrentUser })));
   const { isLoggedIn, requireAuth } = useRequireAuth();
   const openAuthGate = useAuthGateStore((state) => state.open);
-  const { customerNotifications, favorites, hydrateFavorites, hydrateCustomerNotifications } = useAppStore();
+  const { customerNotifications, favorites, hydrateFavorites, hydrateCustomerNotifications } = useAppStore(useShallow((state) => ({ customerNotifications: state.customerNotifications, favorites: state.favorites, hydrateFavorites: state.hydrateFavorites, hydrateCustomerNotifications: state.hydrateCustomerNotifications })));
   const { modal, showActionSheet, showInfo, showError, showSuccess, hideModal } = useModalManager();
   const unreadCount = isLoggedIn ? customerNotifications.filter((notification) => !notification.isRead).length : 0;
   const bookingRecords = useBookingDataStore((state) => state.records);

@@ -18,6 +18,7 @@ import InputFocusWrap from './InputFocusWrap';
 import LoginErrorModal from './LoginErrorModal';
 import KeyboardAwareSheet from './KeyboardAwareSheet';
 import LegalAgreementText from './LegalAgreementText';
+import { useShallow } from 'zustand/react/shallow';
 
 type AuthMode = 'login' | 'signup';
 type LoginErrorType = 'invalid_credentials' | 'empty_fields';
@@ -165,7 +166,7 @@ export default function AuthGateSheet() {
   const close = useAuthGateStore((state) => state.close);
   const consumePendingAction = useAuthGateStore((state) => state.consumePendingAction);
 
-  const { login, signupCustomer } = useAuthStore();
+  const { login, signupCustomer } = useAuthStore(useShallow((state) => ({ login: state.login, signupCustomer: state.signupCustomer })));
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
 
   const [mode, setMode] = useState<AuthMode>('login');

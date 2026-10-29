@@ -27,6 +27,7 @@ import { useAppStore } from '../../store/appStore';
 import { useBookingDataStore } from '../../store/bookingDataStore';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { openPhoneNumber, openWhatsAppContact } from '../../lib/contactActions';
+import { useShallow } from 'zustand/react/shallow';
 
 type DisplayBooking = CustomerBookingCard & {
   providerPhone?: string | null;
@@ -67,9 +68,9 @@ function StatusBadge({ status }: { status: BookingStatus }) {
 
 export default function MyBookingsScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user } = useAuthStore(useShallow((state) => ({ user: state.user })));
   const { isLoggedIn, requireAuth } = useRequireAuth();
-  const { customerNotifications, hydrateCustomerNotifications } = useAppStore();
+  const { customerNotifications, hydrateCustomerNotifications } = useAppStore(useShallow((state) => ({ customerNotifications: state.customerNotifications, hydrateCustomerNotifications: state.hydrateCustomerNotifications })));
   const bookingRecords = useBookingDataStore((state) => state.records);
   const loading = useBookingDataStore((state) => state.loading);
   const loadedAt = useBookingDataStore((state) => state.loadedAt);

@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/authStore';
 import { useAuthGateStore } from '../store/authGateStore';
 
 import { isValidImageUri } from '../lib/config';
+import { useShallow } from 'zustand/react/shallow';
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
@@ -196,7 +197,7 @@ export default function CustomerAppHeader({
 }: CustomerAppHeaderProps) {
   const palette = useThemedColors();
   const styles = useMemo(() => createHeaderStyles(palette), [palette]);
-  const { isLoggedIn, user, logout } = useAuthStore();
+  const { isLoggedIn, user, logout } = useAuthStore(useShallow((state) => ({ isLoggedIn: state.isLoggedIn, user: state.user, logout: state.logout })));
   const openAuthGate = useAuthGateStore((state) => state.open);
 
   const handleAvatarPress = () => {

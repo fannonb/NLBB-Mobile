@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { Category, Provider } from '../../types';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { useShallow } from 'zustand/react/shallow';
 
 function createAllServicesStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
@@ -121,7 +122,16 @@ export default function AllServicesScreen({ navigation }: any) {
   const shadow = useThemedShadows();
   const styles = useMemo(() => createAllServicesStyles(palette, shadow), [palette, shadow]);
   const { isLoggedIn, requireAuth } = useRequireAuth();
-  const { favorites, toggleFavorite, hydrateFavorites } = useAppStore();
+  const { favorites, toggleFavorite, hydrateFavorites } = useAppStore(useShallow((state) => ({ favorites: state.favorites, toggleFavorite: state.toggleFavorite, hydrateFavorites: state.hydrateFavorites })));
+  // Stable handlers so memoized ProviderCards only re-render when their data changes.
+  const openProvider = useCallback(
+    (providerId: string) => navigation.navigate('ProviderDetails', { providerId }),
+    [navigation]
+  );
+  const favoriteProvider = useCallback(
+    (providerId: string) => requireAuth('favorite', () => toggleFavorite(providerId)),
+    [requireAuth, toggleFavorite]
+  );
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProviders, setFeaturedProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -238,9 +248,9 @@ export default function AllServicesScreen({ navigation }: any) {
                   <ProviderCard
                     key={provider.id}
                     provider={provider}
-                    onPress={() => navigation.navigate('ProviderDetails', { providerId: provider.id })}
-                    onBookPress={() => navigation.navigate('ProviderDetails', { providerId: provider.id })}
-                    onFavoritePress={() => requireAuth('favorite', () => toggleFavorite(provider.id))}
+                    onPress={openProvider}
+                    onBookPress={openProvider}
+                    onFavoritePress={favoriteProvider}
                     isFavorited={isLoggedIn && favorites.includes(provider.id)}
                   />
                 ))}

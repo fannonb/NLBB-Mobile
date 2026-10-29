@@ -20,6 +20,7 @@ import KeyboardAwareScrollView from '../../components/KeyboardAwareScrollView';
 import { useModalManager } from '../../hooks/useModalManager';
 import { authApi } from '../../lib/api/auth';
 import { isApiClientError } from '../../lib/api/client';
+import { useShallow } from 'zustand/react/shallow';
 
 interface ProfileForm {
   name: string;
@@ -137,7 +138,7 @@ export default function EditProfileScreen({ navigation }: any) {
   const palette = useThemedColors();
   const shadow = useThemedShadows();
   const styles = useMemo(() => createEditProfileStyles(palette, shadow), [palette, shadow]);
-  const { user, refreshCurrentUser } = useAuthStore();
+  const { user, refreshCurrentUser } = useAuthStore(useShallow((state) => ({ user: state.user, refreshCurrentUser: state.refreshCurrentUser })));
   const [form, setForm] = useState<ProfileForm>({
     name: user?.name ?? '',
     email: user?.email ?? '',

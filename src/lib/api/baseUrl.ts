@@ -130,7 +130,10 @@ export const fetchWithApiBaseUrlFallback = async (
   const errors: string[] = [];
   let backendRecentlyUnavailable = Date.now() < backendUnavailableUntil;
 
-  if (!discoveryDone || backendRecentlyUnavailable) {
+  // Probing only helps choose between several dev URLs. With a single URL (production, or
+  // EXPO_PUBLIC_API_BASE_URL set) it is a wasted round trip before the first real request,
+  // and on a cold server it stalls for the full probe timeout.
+  if (API_BASE_URLS.length > 1 && (!discoveryDone || backendRecentlyUnavailable)) {
     discoveryDone = true;
     const probed = await probeHealthyBaseUrl();
     if (probed) {

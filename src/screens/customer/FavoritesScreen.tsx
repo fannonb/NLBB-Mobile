@@ -12,6 +12,7 @@ import { withProviderDistances } from '../../lib/location/providerDistance';
 import { useAppStore } from '../../store/appStore';
 
 import { coalesceImageUri } from '../../lib/config';
+import { useShallow } from 'zustand/react/shallow';
 
 function createFavoritesStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
@@ -75,7 +76,7 @@ export default function FavoritesScreen({ navigation }: any) {
   const shadow = useThemedShadows();
   const styles = useMemo(() => createFavoritesStyles(palette, shadow), [palette, shadow]);
   const currentLocation = useCurrentDeviceLocation();
-  const { favorites, removeFavorite, hydrateFavorites } = useAppStore();
+  const { favorites, removeFavorite, hydrateFavorites } = useAppStore(useShallow((state) => ({ favorites: state.favorites, removeFavorite: state.removeFavorite, hydrateFavorites: state.hydrateFavorites })));
   const { isLoggedIn, requireAuth } = useRequireAuth();
   const { providers, loading } = useProviderDirectory();
   const [favoritesLoading, setFavoritesLoading] = useState(isLoggedIn);

@@ -6,6 +6,7 @@ import { useThemedColors } from '../../hooks/useThemedColors';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { hasCompletedOnboarding } from '../../lib/onboardingPreference';
+import { useShallow } from 'zustand/react/shallow';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MIN_SPLASH_MS = 600;
@@ -27,7 +28,7 @@ export default function SplashScreen({ navigation }: any) {
   const themeMode = useAppStore((state) => state.theme);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const { initialize } = useAuthStore();
+  const { initialize } = useAuthStore(useShallow((state) => ({ initialize: state.initialize })));
 
   useEffect(() => {
     let isMounted = true;

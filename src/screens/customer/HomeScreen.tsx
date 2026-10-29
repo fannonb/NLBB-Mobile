@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ import { coalesceImageUri, isValidImageUri } from '../../lib/config';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useBookingDataStore } from '../../store/bookingDataStore';
+import { useShallow } from 'zustand/react/shallow';
 
 type BookAgainItem = {
   providerId: string;
@@ -316,7 +317,7 @@ export default function HomeScreen({ navigation }: any) {
   const palette = useThemedColors();
   const shadow = useThemedShadows();
   const styles = useMemo(() => createHomeStyles(palette, shadow), [palette, shadow]);
-  const { user } = useAuthStore();
+  const { user } = useAuthStore(useShallow((state) => ({ user: state.user })));
   const currentLocation = useCurrentDeviceLocation();
   const { isLoggedIn, requireAuth } = useRequireAuth();
   const { openBooking } = useOpenBooking();
@@ -326,7 +327,7 @@ export default function HomeScreen({ navigation }: any) {
     hydrateFavorites,
     customerNotifications,
     hydrateCustomerNotifications,
-  } = useAppStore();
+  } = useAppStore(useShallow((state) => ({ favorites: state.favorites, toggleFavorite: state.toggleFavorite, hydrateFavorites: state.hydrateFavorites, customerNotifications: state.customerNotifications, hydrateCustomerNotifications: state.hydrateCustomerNotifications })));
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [favoritesLoading, setFavoritesLoading] = useState(isLoggedIn);
@@ -383,6 +384,16 @@ export default function HomeScreen({ navigation }: any) {
     }
     return recent;
   }, [bookingRecords, isLoggedIn]);
+
+  // Stable handlers so memoized ProviderCards only re-render when their data changes.
+  const openProvider = useCallback(
+    (providerId: string) => navigation.navigate('ProviderDetails', { providerId }),
+    [navigation]
+  );
+  const favoriteProvider = useCallback(
+    (providerId: string) => requireAuth('favorite', () => toggleFavorite(providerId)),
+    [requireAuth, toggleFavorite]
+  );
 
   const rankedProviders = useMemo(
     () => withProviderDistances(providers, currentLocation),
@@ -568,13 +579,14 @@ export default function HomeScreen({ navigation }: any) {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.hScroll}
             >
-              {filteredProviders.map((provider) => (
+              {/* Horizontal row isn't virtualized; "See all" lists everyone. */}
+              {filteredProviders.slice(0, 12).map((provider) => (
                 <ProviderCard
                   key={provider.id}
                   provider={provider}
-                  onPress={() => navigation.navigate('ProviderDetails', { providerId: provider.id })}
-                  onBookPress={() => navigation.navigate('ProviderDetails', { providerId: provider.id })}
-                  onFavoritePress={() => requireAuth('favorite', () => toggleFavorite(provider.id))}
+                  onPress={openProvider}
+                  onBookPress={openProvider}
+                  onFavoritePress={favoriteProvider}
                   isFavorited={isLoggedIn && favorites.includes(provider.id)}
                 />
               ))}

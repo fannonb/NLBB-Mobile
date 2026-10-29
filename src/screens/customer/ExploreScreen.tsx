@@ -29,6 +29,7 @@ import { Provider } from '../../types';
 
 import ProviderCoverImage from '../../components/ProviderCoverImage';
 import { formatRatingSummary } from '../../lib/ratingLabel';
+import { useShallow } from 'zustand/react/shallow';
 
 function createExploreStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
@@ -150,8 +151,8 @@ export default function ExploreScreen({ navigation, route }: any) {
   const shadow = useThemedShadows();
   const styles = useMemo(() => createExploreStyles(palette, shadow), [palette, shadow]);
   const currentLocation = useCurrentDeviceLocation();
-  const { user } = useAuthStore();
-  const { customerNotifications, hydrateCustomerNotifications } = useAppStore();
+  const { user } = useAuthStore(useShallow((state) => ({ user: state.user })));
+  const { customerNotifications, hydrateCustomerNotifications } = useAppStore(useShallow((state) => ({ customerNotifications: state.customerNotifications, hydrateCustomerNotifications: state.hydrateCustomerNotifications })));
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [filters, setFilters] = useState<ExploreFilters>(DEFAULT_EXPLORE_FILTERS);
