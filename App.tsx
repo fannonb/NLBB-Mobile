@@ -6,9 +6,10 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { ActivityIndicator, AppState, Linking, StyleSheet, View, type AppStateStatus } from 'react-native';
+import { ActivityIndicator, AppState, Appearance, Linking, StyleSheet, View } from 'react-native';
 import * as Font from 'expo-font';
 import { applyThemeMode, getThemeColors, ThemeMode } from './src/constants/theme';
+import { contentColumn } from './src/constants/layout';
 import { loadThemePreference } from './src/lib/themePreference';
 import { useAppStore } from './src/store/appStore';
 import { useAuthStore } from './src/store/authStore';
@@ -181,7 +182,7 @@ export default function App() {
       handleUrl(url);
     });
 
-    void Linking.getInitialURL().then(handleUrl).catch(() => undefined);
+    void Linking.getInitialURL().then((url) => handleUrl(url ?? null)).catch(() => undefined);
 
     return () => {
       subscription.remove();
@@ -212,7 +213,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    let lastState: AppStateStatus = AppState.currentState;
+    let lastState: string = AppState.currentState ?? 'unknown';
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (lastState === 'active' && nextState.match(/inactive|background/)) {
         void touchStoredSessionActivity();
@@ -258,14 +259,22 @@ export default function App() {
     }
   }, [navigationReady, pendingPushPayload]);
 
+  useEffect(() => {
+    // Keep system UI (keyboard, alerts, date pickers) in step with the in-app theme
+    // rather than the device setting; app.config uses userInterfaceStyle 'automatic'.
+    Appearance.setColorScheme(themeMode);
+  }, [themeMode]);
+
   const themeColors = useMemo(() => getThemeColors(themeMode), [themeMode]);
 
   if (!isBootstrapped) {
     return (
       <GestureHandlerRootView style={[styles.root, { backgroundColor: themeColors.bg }]}>
         <SafeAreaProvider>
-          <View style={styles.loadingState}>
-            <ActivityIndicator size="small" color={themeColors.gold} />
+          <View style={[styles.root, contentColumn]}>
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="small" color={themeColors.gold} />
+            </View>
           </View>
         </SafeAreaProvider>
       </GestureHandlerRootView>
@@ -275,13 +284,17 @@ export default function App() {
   return (
     <GestureHandlerRootView style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <SafeAreaProvider>
-        <NavigationContainer
-          ref={navigationRef}
-          onReady={() => setNavigationReady(true)}
-        >
-          <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
-          <RootNavigator />
-        </NavigationContainer>
+        {/* Wide screens (tablets, foldables, landscape) get a centred column instead of a
+            stretched phone layout. Safe-area insets still come from the real device. */}
+        <View style={[styles.root, contentColumn]}>
+          <NavigationContainer
+            ref={navigationRef}
+            onReady={() => setNavigationReady(true)}
+          >
+            <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
+            <RootNavigator />
+          </NavigationContainer>
+        </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

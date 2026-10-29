@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { ColorPalette, Fonts, ShadowPalette } from '../constants/theme';
 import { useThemedColors, useThemedShadows } from '../hooks/useThemedColors';
 import { useAuthStore } from '../store/authStore';
+import { useAuthGateStore } from '../store/authGateStore';
 
 import { isValidImageUri } from '../lib/config';
 
@@ -116,6 +117,13 @@ function createHeaderStyles(p: ColorPalette) {
       lineHeight: 16,
     },
     right: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    signInBtn: {
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+      borderRadius: 999,
+      backgroundColor: p.gold,
+    },
+    signInText: { color: p.bg, fontFamily: Fonts.sansBold, fontSize: 13 },
     avatarBtn: {
       overflow: 'hidden',
     },
@@ -189,6 +197,7 @@ export default function CustomerAppHeader({
   const palette = useThemedColors();
   const styles = useMemo(() => createHeaderStyles(palette), [palette]);
   const { isLoggedIn, user, logout } = useAuthStore();
+  const openAuthGate = useAuthGateStore((state) => state.open);
 
   const handleAvatarPress = () => {
     if (onAvatarPress) {
@@ -226,19 +235,26 @@ export default function CustomerAppHeader({
             onPress={onNotifPress}
           />
         )}
-        {showAvatar ? (
+        {showAvatar && isLoggedIn ? (
           <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.85} style={styles.avatarBtn}>
             <View style={styles.avatar}>
-              {isLoggedIn ? (
-                user?.avatar && isValidImageUri(user.avatar) ? (
-                  <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
-                ) : (
-                  <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
-                )
+              {user?.avatar && isValidImageUri(user.avatar) ? (
+                <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
               ) : (
-                <Feather name="user" size={18} color={palette.textSecondary} />
+                <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
               )}
             </View>
+          </TouchableOpacity>
+        ) : null}
+        {/* Guests get an action here instead of a second shortcut to the Profile tab. */}
+        {showAvatar && !isLoggedIn ? (
+          <TouchableOpacity
+            onPress={() => openAuthGate('profile')}
+            activeOpacity={0.85}
+            style={styles.signInBtn}
+            accessibilityRole="button"
+          >
+            <Text style={styles.signInText}>Sign in</Text>
           </TouchableOpacity>
         ) : null}
       </View>

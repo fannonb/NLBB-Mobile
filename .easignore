@@ -43,6 +43,8 @@ metro.tunnel.out.log
 
 *.md
 *.png
+*.apk
+*.aab
 window_dump.xml
 
 !N.L.B.B.png

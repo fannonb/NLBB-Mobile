@@ -13,6 +13,7 @@ import {
   setStoredUser,
 } from '../lib/authSession';
 import { preferencesApi } from '../lib/api/preferences';
+import { clearRegisteredPushToken, getRegisteredPushToken } from '../lib/push';
 import { saveThemePreference } from '../lib/themePreference';
 import {
   DEMO_PASSWORD,
@@ -469,6 +470,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       await authApi.deleteAccount({ password });
       lastUserRefreshAt = 0;
+      clearRegisteredPushToken();
       set({ user: null, isLoggedIn: false, isInitializing: false, isReady: true, authNotice: null });
       resetSignedOutState();
       await clearStoredAuth();
@@ -487,6 +489,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     lastUserRefreshAt = 0;
     const sessionPromise = getStoredSession();
+    const pushToken = getRegisteredPushToken();
+    clearRegisteredPushToken();
     set({ user: null, isLoggedIn: false, isInitializing: false, isReady: true, authNotice: null });
     resetSignedOutState();
     void clearStoredAuth();
@@ -496,7 +500,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         ? getDemoUserFromToken(session.accessToken) !== null
         : false;
       if (!isDemo && session?.accessToken) {
-        void authApi.logoutWithAccessToken(session.accessToken).catch(() => undefined);
+        void authApi.logoutWithAccessToken(session.accessToken, pushToken).catch(() => undefined);
       }
     });
   },

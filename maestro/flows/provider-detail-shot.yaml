@@ -1,0 +1,19 @@
+appId: com.nlbb.mobile
+name: Provider detail screenshot only
+---
+- launchApp
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- runFlow:
+    when:
+      visible: "Explore"
+    commands:
+      - tapOn: "Explore"
+- waitForAnimationToEnd
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- extendedWaitUntil:
+    visible: "Obongita Hair Den"
+    timeout: 20000
+- tapOn: "Obongita Hair Den"
+- waitForAnimationToEnd
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- takeScreenshot: ${DEVICE_LABEL}_03_provider_details

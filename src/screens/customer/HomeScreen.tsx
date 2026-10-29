@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Dimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,10 +28,6 @@ import { coalesceImageUri, isValidImageUri } from '../../lib/config';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useBookingDataStore } from '../../store/bookingDataStore';
-
-const SCREEN_W = Dimensions.get('window').width;
-// Width of each tile in a 3-column grid (24px padding each side, 10px gap × 2)
-const TILE_W = (SCREEN_W - 48 - 20) / 3;
 
 type BookAgainItem = {
   providerId: string;
@@ -96,7 +91,7 @@ function createHomeStyles(palette: ColorPalette, _shadow: ShadowPalette) {
       gap: 10,
     },
     catCell: {
-      width: TILE_W,
+      flex: 1,
     },
 
     // ── Book Again ────────────────────────────────────────────

@@ -106,7 +106,7 @@ export interface Review {
 
 export interface Subscription {
   providerId: string;
-  status: 'active' | 'expired' | 'pending' | 'suspended';
+  status: 'active' | 'expired' | 'pending' | 'suspended' | 'paused';
   renewalDate: string;
   amount: number;
   planAmount?: number;
@@ -114,6 +114,11 @@ export interface Subscription {
   paymentMethod: 'mpesa';
   lastPaymentId?: string;
   updatedAt?: string;
+  paused?: boolean;
+  pauseScope?: 'account' | 'global' | 'both' | null;
+  pauseReason?: string | null;
+  remainingMs?: number;
+  remainingDays?: number;
 }
 
 export interface Payment {

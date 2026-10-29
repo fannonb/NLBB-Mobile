@@ -22,6 +22,7 @@ import { paymentsApi } from '../../lib/api/payments';
 import { providerManagementApi } from '../../lib/api/providerManagement';
 import { clearProviderDirectoryCache } from '../../lib/api/providers';
 import { Payment, Subscription } from '../../types';
+import { isSubscriptionEffectivelyActive, subscriptionPauseMessage } from '../../lib/subscriptionAccess';
 
 const formatDate = (value?: string | null) => {
   if (!value) {
@@ -258,12 +259,7 @@ export default function SubscriptionScreen({ navigation }: any) {
     wasActive: boolean;
   } | null>(null);
 
-  const isSubscriptionActive = (value: Subscription | null) => {
-    if (!value || value.status !== 'active') {
-      return false;
-    }
-    return new Date(value.renewalDate).getTime() > Date.now();
-  };
+  const isSubscriptionActive = (value: Subscription | null) => isSubscriptionEffectivelyActive(value);
 
   const loadData = async (
     showSpinner = true
@@ -327,7 +323,8 @@ export default function SubscriptionScreen({ navigation }: any) {
   const planAmount = subscription?.planAmount ?? amount;
   const creditBalance = subscription?.creditBalance ?? 0;
   const renewalDate = subscription?.renewalDate ?? null;
-  const daysLeft = calculateDaysLeft(renewalDate);
+  const daysLeft = subscription?.remainingDays ?? calculateDaysLeft(renewalDate);
+  const pauseMessage = subscriptionPauseMessage(subscription);
   const confirmedPayments = useMemo(
     () => payments.filter((payment) => payment.status === 'success'),
     [payments]
@@ -501,9 +498,17 @@ export default function SubscriptionScreen({ navigation }: any) {
                 />
               </View>
               <View>
-                <Text style={styles.statusLabel}>{isActive ? 'Active Subscription' : 'Subscription Inactive'}</Text>
+                <Text style={styles.statusLabel}>
+                  {isActive
+                    ? pauseMessage
+                      ? 'Complimentary access'
+                      : 'Active Subscription'
+                    : 'Subscription Inactive'}
+                </Text>
                 <Text style={[styles.statusSub, { color: isActive ? palette.success : palette.error }]}>
-                  {isActive ? 'Your listing is live' : 'Renew to restore visibility'}
+                  {isActive
+                    ? pauseMessage ?? 'Your listing is live'
+                    : 'Renew to restore visibility'}
                 </Text>
               </View>
             </View>
@@ -517,14 +522,16 @@ export default function SubscriptionScreen({ navigation }: any) {
                 <Text style={styles.statusDetailValue}>{formatDate(renewalDate)}</Text>
               </View>
               <View style={styles.statusDetailItem}>
-                <Text style={styles.statusDetailLabel}>Days Left</Text>
+                <Text style={styles.statusDetailLabel}>{pauseMessage ? 'Paid days frozen' : 'Days Left'}</Text>
                 <Text style={styles.statusDetailValue}>{daysLeft}</Text>
               </View>
             </View>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{isActive ? 'Renew Early' : 'Activate Subscription'}</Text>
+            <Text style={styles.sectionTitle}>
+              {pauseMessage ? 'Add paid days (optional)' : isActive ? 'Renew Early' : 'Activate Subscription'}
+            </Text>
             <View style={styles.paymentCard}>
               <View style={styles.amountRow}>
                 <Text style={styles.amountLabel}>Amount due after credit</Text>

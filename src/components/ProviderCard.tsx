@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
@@ -11,7 +10,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../constants/theme';
 import { getCategoryVisual } from '../constants/categoryVisuals';
 import { useThemedColors, useThemedShadows } from '../hooks/useThemedColors';
-import { coalesceImageUri } from '../lib/config';
+import ProviderCoverImage from './ProviderCoverImage';
+import { formatRatingSummary } from '../lib/ratingLabel';
 import { Provider } from '../types';
 
 interface ProviderCardProps {
@@ -218,15 +218,12 @@ export default function ProviderCard({
 
   const topServices = provider.services?.slice(0, 2) ?? [];
 
-  const reviewLabel =
-    provider.reviewCount > 0
-      ? `${provider.rating} (${provider.reviewCount})`
-      : `${provider.rating}`;
+  const reviewLabel = formatRatingSummary(provider.rating, provider.reviewCount);
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={styles.card}>
       <View style={styles.imageContainer}>
-        <Image source={{ uri: coalesceImageUri(provider.coverImage) }} style={styles.image} />
+        <ProviderCoverImage uri={provider.coverImage} category={provider.category} style={styles.image} iconSize={40} />
 
         {/* Availability badge */}
         <View style={styles.availBadge}>

@@ -9,12 +9,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import { ImageSource, pickImageAsDataUri } from '../../lib/imagePicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { useAuthStore } from '../../store/authStore';
-import ChangePasswordModal, { ChangePasswordResult } from '../../components/ChangePasswordModal';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
 import ActionSheetModal, { ActionSheetOption } from '../../components/ActionSheetModal';
 import KeyboardAwareScrollView from '../../components/KeyboardAwareScrollView';
@@ -95,6 +94,8 @@ function createEditProfileStyles(p: ColorPalette, s: ShadowPalette) {
       ...s.soft,
     },
     inputError: { borderColor: p.error, backgroundColor: 'rgba(220,38,38,0.08)' },
+    inputReadOnly: { flexDirection: 'row', alignItems: 'center', gap: 8, opacity: 0.75 },
+    readOnlyText: { flex: 1, color: p.textSecondary, fontFamily: Fonts.sans, fontSize: 14 },
     errorText: { color: p.error, fontFamily: Fonts.sans, fontSize: 12, marginTop: 6 },
     infoBox: {
       flexDirection: 'row',
@@ -128,52 +129,6 @@ function createEditProfileStyles(p: ColorPalette, s: ShadowPalette) {
       backgroundColor: p.card,
     },
     cancelBtnText: { color: p.textSecondary, fontFamily: Fonts.sansMedium, fontSize: 14 },
-    divider: {
-      height: 1,
-      backgroundColor: p.borderLight,
-      marginVertical: 24,
-    },
-    securitySection: {
-      marginBottom: 24,
-    },
-    sectionLabel: {
-      fontFamily: Fonts.serifMedium,
-      fontSize: 16,
-      color: p.textPrimary,
-      marginBottom: 16,
-    },
-    changePasswordBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: p.card,
-      borderRadius: Radius.md,
-      borderWidth: 1,
-      borderColor: p.border,
-      padding: 16,
-      gap: 12,
-    },
-    changePasswordIcon: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: p.cardInner,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    changePasswordContent: {
-      flex: 1,
-    },
-    changePasswordTitle: {
-      fontFamily: Fonts.sansMedium,
-      fontSize: 14,
-      color: p.textPrimary,
-      marginBottom: 4,
-    },
-    changePasswordSub: {
-      fontFamily: Fonts.sans,
-      fontSize: 12,
-      color: p.textSecondary,
-    },
   });
 }
 
@@ -192,71 +147,31 @@ export default function EditProfileScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [changePasswordVisible, setChangePasswordVisible] = useState(false);
   const { modal, showSuccess, showError, showInfo, showActionSheet, hideModal } = useModalManager();
 
-  const canSave = form.name.trim().length > 0 && form.email.trim().length > 0 && form.phone.trim().length >= 9;
-  const hasChanges =
-    form.name !== user?.name || form.email !== user?.email || form.phone !== user?.phone || form.avatar !== user?.avatar;
+  const phoneDigits = form.phone.replace(/\D/g, '');
+  const phoneValid = phoneDigits.length >= 9;
+  const phoneInvalid = !!touched.phone && !phoneValid;
+  const canSave = form.name.trim().length > 0 && phoneValid;
+  const hasChanges = form.name !== user?.name || form.phone !== user?.phone || form.avatar !== user?.avatar;
 
-  const ensureMediaPermission = async (source: 'camera' | 'gallery') => {
-    if (source === 'camera') {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        showInfo('Permission Required', 'Camera permission is required to take a photo.');
-        return false;
-      }
-      return true;
-    }
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showInfo('Permission Required', 'Gallery permission is required to select a photo.');
-      return false;
-    }
-    return true;
-  };
-
-  const uploadPickedAvatar = async (source: 'camera' | 'gallery') => {
-    const allowed = await ensureMediaPermission(source);
-    if (!allowed) {
-      return;
-    }
-
-    const pickerOptions: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-      base64: true,
-    };
-
+  const uploadPickedAvatar = async (source: ImageSource) => {
     try {
-      const result =
-        source === 'camera'
-          ? await ImagePicker.launchCameraAsync(pickerOptions)
-          : await ImagePicker.launchImageLibraryAsync(pickerOptions);
-
-      if (result.canceled || result.assets.length === 0) {
+      const picked = await pickImageAsDataUri(source, { aspect: [1, 1] });
+      if (picked.status === 'permission-denied') {
+        showInfo('Permission Required', `${source === 'camera' ? 'Camera' : 'Gallery'} permission is required to update your photo.`);
         return;
       }
-
-      const asset = result.assets[0];
-      if (!asset.base64) {
+      if (picked.status === 'unreadable') {
         showError('Error', 'Could not process selected image. Please try another image.');
         return;
       }
-
-      const mimeType =
-        asset.mimeType && asset.mimeType.startsWith('image/')
-          ? asset.mimeType
-          : asset.uri.toLowerCase().endsWith('.png')
-            ? 'image/png'
-            : 'image/jpeg';
+      if (picked.status !== 'picked') {
+        return;
+      }
 
       setUploadingAvatar(true);
-      const dataUri = `data:${mimeType};base64,${asset.base64}`;
-      const updatedUser = await authApi.uploadAvatar({ dataUri });
+      const updatedUser = await authApi.uploadAvatar({ dataUri: picked.dataUri });
       setForm((f) => ({ ...f, avatar: updatedUser.avatar ?? f.avatar }));
       await refreshCurrentUser({ force: true });
     } catch (error) {
@@ -292,7 +207,7 @@ export default function EditProfileScreen({ navigation }: any) {
 
   const handleSave = async () => {
     if (!canSave) {
-      showError('Validation Error', 'Name, email, and a valid phone number are required.');
+      showError('Validation Error', 'Name and a valid phone number are required.');
       return;
     }
 
@@ -300,7 +215,6 @@ export default function EditProfileScreen({ navigation }: any) {
     try {
       const updatedUser = await authApi.upsertProfile({
         name: form.name.trim(),
-        email: form.email.trim().toLowerCase(),
         phone: form.phone.trim(),
         role: user?.role ?? 'customer',
         avatar: form.avatar,
@@ -326,30 +240,6 @@ export default function EditProfileScreen({ navigation }: any) {
   };
 
   const avatarInitial = (form.name?.trim()?.charAt(0) ?? 'U').toUpperCase();
-
-  const handleChangePassword = async (currentPassword: string, newPassword: string): Promise<ChangePasswordResult> => {
-    try {
-      await authApi.changePassword({
-        currentPassword,
-        newPassword,
-      });
-      return { success: true };
-    } catch (error) {
-      if (isApiClientError(error) && (error.code === 'INVALID_CREDENTIALS' || error.status === 401)) {
-        return {
-          success: false,
-          field: 'currentPassword',
-          errorMessage: 'Current password is incorrect',
-        };
-      }
-
-      return {
-        success: false,
-        errorMessage:
-          isApiClientError(error) ? error.message : error instanceof Error ? error.message : 'Failed to change password',
-      };
-    }
-  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -402,56 +292,35 @@ export default function EditProfileScreen({ navigation }: any) {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Email Address *</Text>
-            <TextInput
-              style={[styles.input, touched.email && !form.email && styles.inputError]}
-              placeholder="Enter your email"
-              placeholderTextColor={palette.textMuted}
-              keyboardType="email-address"
-              value={form.email}
-              onChangeText={(text) => setForm((f) => ({ ...f, email: text }))}
-              onBlur={() => setTouched((t) => ({ ...t, email: true }))}
-            />
-            {touched.email && !form.email && <Text style={styles.errorText}>Email is required</Text>}
+            <Text style={styles.label}>Email Address</Text>
+            <View style={[styles.input, styles.inputReadOnly]}>
+              <Text style={styles.readOnlyText} numberOfLines={1}>
+                {form.email || 'No email on file'}
+              </Text>
+              <Feather name="lock" size={14} color={palette.textMuted} />
+            </View>
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Phone Number</Text>
+            <Text style={styles.label}>Phone Number *</Text>
             <TextInput
-              style={styles.input}
-              placeholder="Enter your phone number"
+              style={[styles.input, phoneInvalid && styles.inputError]}
+              placeholder="e.g. 0712 345 678"
               placeholderTextColor={palette.textMuted}
               keyboardType="phone-pad"
               value={form.phone}
               onChangeText={(text) => setForm((f) => ({ ...f, phone: text }))}
+              onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
             />
+            {phoneInvalid && <Text style={styles.errorText}>Enter a phone number with at least 9 digits</Text>}
           </View>
         </View>
 
         <View style={styles.infoBox}>
           <Feather name="info" size={16} color={palette.gold} />
-          <Text style={styles.infoText}>Your email is used for login and important account notifications</Text>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.securitySection}>
-          <Text style={styles.sectionLabel}>Security</Text>
-
-          <TouchableOpacity
-            style={styles.changePasswordBtn}
-            onPress={() => setChangePasswordVisible(true)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.changePasswordIcon}>
-              <Feather name="shield" size={20} color={palette.gold} />
-            </View>
-            <View style={styles.changePasswordContent}>
-              <Text style={styles.changePasswordTitle}>Change Password</Text>
-              <Text style={styles.changePasswordSub}>Update your password to keep your account secure</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color={palette.textMuted} />
-          </TouchableOpacity>
+          <Text style={styles.infoText}>
+            Your email is your login and can't be changed in the app. Contact support if you need to update it.
+          </Text>
         </View>
 
         <View style={styles.buttonGroup}>
@@ -475,14 +344,6 @@ export default function EditProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </KeyboardAwareScrollView>
-
-      <ChangePasswordModal
-        visible={changePasswordVisible}
-        onDismiss={() => setChangePasswordVisible(false)}
-        onChangePassword={handleChangePassword}
-        onSuccess={showSuccess}
-        onError={showError}
-      />
 
       <FeedbackModalHost modal={modal} onDismiss={hideModal} />
 

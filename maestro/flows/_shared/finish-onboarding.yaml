@@ -1,0 +1,28 @@
+appId: com.nlbb.mobile
+---
+# Skip first-run onboarding into guest browse when present.
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+- runFlow:
+    when:
+      visible: "Browse as Guest"
+    commands:
+      - tapOn: "Browse as Guest"
+- runFlow:
+    when:
+      visible: "Next"
+    commands:
+      - tapOn: "Next"
+      - runFlow:
+          when:
+            visible: "Next"
+          commands:
+            - tapOn: "Next"
+      - runFlow:
+          when:
+            visible: "Browse as Guest"
+          commands:
+            - tapOn: "Browse as Guest"

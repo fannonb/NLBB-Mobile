@@ -1,0 +1,96 @@
+appId: com.nlbb.mobile
+name: Guest browse screenshots (Play Store)
+tags:
+  - screenshots
+  - guest
+  - playstore
+---
+- clearState
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: ".*(Next|Find local services|Discover beauty near you|Browse as Guest).*"
+    timeout: 90000
+- runFlow: _shared/dismiss-system-dialogs.yaml
+# Prefer Skip when present; otherwise advance with Next
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+- runFlow:
+    when:
+      visible: "Next"
+    commands:
+      - tapOn: "Next"
+      - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: "Next"
+          commands:
+            - tapOn: "Next"
+            - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: "Next"
+          commands:
+            - tapOn: "Next"
+            - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: "Browse as Guest"
+          commands:
+            - tapOn: "Browse as Guest"
+- runFlow: _shared/finish-onboarding.yaml
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- runFlow: _shared/finish-onboarding.yaml
+- runFlow: _shared/dismiss-system-dialogs.yaml
+
+- extendedWaitUntil:
+    visible:
+      text: ".*(Discover beauty near you|Search barbers|Services|Near you).*"
+    timeout: 20000
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- takeScreenshot: ${DEVICE_LABEL}_01_guest_home
+
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- runFlow:
+    when:
+      visible: "Explore"
+    commands:
+      - tapOn: "Explore"
+- runFlow:
+    when:
+      visible: "Open Explore"
+    commands:
+      - tapOn: "Open Explore"
+- waitForAnimationToEnd
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- takeScreenshot: ${DEVICE_LABEL}_02_guest_explore
+
+- runFlow:
+    when:
+      visible: "Fade Masters Barbershop"
+    commands:
+      - tapOn: "Fade Masters Barbershop"
+      - waitForAnimationToEnd
+      - takeScreenshot: ${DEVICE_LABEL}_03_provider_details
+      - scroll
+      - takeScreenshot: ${DEVICE_LABEL}_04_provider_details_menu
+
+# Any visible provider card (non-demo builds)
+- runFlow:
+    when:
+      visible: ".*(Barbershop|Salon|Spa|Nails|Hair).*"
+      notVisible: "Fade Masters Barbershop"
+    commands:
+      - tapOn:
+          text: ".*(Barbershop|Salon|Spa).*"
+          index: 0
+      - waitForAnimationToEnd
+      - takeScreenshot: ${DEVICE_LABEL}_03_provider_details
+
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- tapOn: "Profile"
+- waitForAnimationToEnd
+- takeScreenshot: ${DEVICE_LABEL}_05_guest_profile

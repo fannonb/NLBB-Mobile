@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Image, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, Animated, Image } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Brand, Fonts } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
+import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { hasCompletedOnboarding } from '../../lib/onboardingPreference';
 
@@ -22,6 +24,7 @@ const waitForAuthInitialization = async (initialize: () => Promise<void>) => {
 
 export default function SplashScreen({ navigation }: any) {
   const palette = useThemedColors();
+  const themeMode = useAppStore((state) => state.theme);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const { initialize } = useAuthStore();
@@ -97,7 +100,7 @@ export default function SplashScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={palette.bg} />
+      <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
       <View style={[styles.circle1, { borderColor: palette.brotherhoodRing }]} />
       <View style={[styles.circle2, { borderColor: palette.brotherhoodRingDim }]} />
 

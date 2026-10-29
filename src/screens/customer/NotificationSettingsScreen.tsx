@@ -16,6 +16,7 @@ import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { useModalManager } from '../../hooks/useModalManager';
 import { DEFAULT_NOTIFICATION_SETTINGS, NotificationSettings, preferencesApi } from '../../lib/api/preferences';
 import { useAppStore } from '../../store/appStore';
+import { useAuthStore } from '../../store/authStore';
 
 type NotificationSettingId = keyof NotificationSettings;
 
@@ -31,67 +32,60 @@ interface NotificationSection {
   data: NotificationSettingMeta[];
 }
 
-const SECTIONS: NotificationSection[] = [
+// Only settings the backend enforces are listed (see the `preference` passed to
+// createNotification in the backend). Keys are reused per role with role-specific copy.
+const CUSTOMER_SECTIONS: NotificationSection[] = [
   {
-    title: 'Booking Notifications',
+    title: 'Bookings',
     data: [
       {
         id: 'bookingConfirmation',
-        label: 'Booking Confirmation',
-        description: 'Get notified when a booking is confirmed',
+        label: 'Booking Confirmations',
+        description: 'When your request is sent and when a provider accepts it',
         icon: 'check-circle',
-      },
-      {
-        id: 'bookingReminder',
-        label: 'Booking Reminder',
-        description: 'Reminder 24 hours before your appointment',
-        icon: 'clock',
       },
       {
         id: 'bookingUpdate',
         label: 'Booking Updates',
-        description: 'Changes or cancellations to your bookings',
+        description: 'Declines, cancellations, completed visits and payment receipts',
+        icon: 'edit-3',
+      },
+    ],
+  },
+];
+
+const PROVIDER_SECTIONS: NotificationSection[] = [
+  {
+    title: 'Bookings',
+    data: [
+      {
+        id: 'bookingConfirmation',
+        label: 'New Booking Requests',
+        description: 'When a customer requests an appointment',
+        icon: 'calendar',
+      },
+      {
+        id: 'bookingUpdate',
+        label: 'Cancellations & Payments',
+        description: 'When a customer cancels or a booking payment is confirmed',
         icon: 'edit-3',
       },
     ],
   },
   {
-    title: 'Provider Updates',
+    title: 'Business',
     data: [
-      {
-        id: 'providerMessage',
-        label: 'Direct Messages',
-        description: 'Messages from your service providers',
-        icon: 'message-circle',
-      },
-      {
-        id: 'providerPromo',
-        label: 'Special Offers',
-        description: 'Promotions and discounts from providers',
-        icon: 'gift',
-      },
       {
         id: 'providerReview',
-        label: 'Review Requests',
-        description: 'Requests to review completed services',
+        label: 'New Reviews',
+        description: 'When a customer reviews your business',
         icon: 'star',
-      },
-    ],
-  },
-  {
-    title: 'General Notifications',
-    data: [
-      {
-        id: 'appUpdate',
-        label: 'App Updates',
-        description: 'News about new features and improvements',
-        icon: 'package',
       },
       {
         id: 'accountAlert',
-        label: 'Account Alerts',
-        description: 'Security and account-related notifications',
-        icon: 'alert-circle',
+        label: 'Subscription & Billing',
+        description: 'Renewal reminders, expiry notices and payment confirmations',
+        icon: 'credit-card',
       },
     ],
   },
@@ -194,6 +188,8 @@ export default function NotificationSettingsScreen({ navigation }: any) {
   const styles = useMemo(() => createNotificationSettingsStyles(palette, shadow), [palette, shadow]);
   const storeNotificationSettings = useAppStore((state) => state.notificationSettings);
   const updateNotificationSettings = useAppStore((state) => state.updateNotificationSettings);
+  const role = useAuthStore((state) => state.user?.role);
+  const sections = role === 'provider' ? PROVIDER_SECTIONS : CUSTOMER_SECTIONS;
   const [settings, setSettings] = useState<NotificationSettings>({
     ...DEFAULT_NOTIFICATION_SETTINGS,
     ...storeNotificationSettings,
@@ -264,21 +260,13 @@ export default function NotificationSettingsScreen({ navigation }: any) {
     });
   };
 
-  const enableAll = () => {
-    const nextSettings = Object.keys(settings).reduce((acc, key) => {
-      const typedKey = key as NotificationSettingId;
-      acc[typedKey] = true;
-      return acc;
-    }, {} as NotificationSettings);
-    void saveNotificationSettings(nextSettings);
-  };
-
-  const disableAll = () => {
-    const nextSettings = Object.keys(settings).reduce((acc, key) => {
-      const typedKey = key as NotificationSettingId;
-      acc[typedKey] = false;
-      return acc;
-    }, {} as NotificationSettings);
+  const setAllVisible = (enabled: boolean) => {
+    const nextSettings = { ...settings };
+    for (const section of sections) {
+      for (const item of section.data) {
+        nextSettings[item.id] = enabled;
+      }
+    }
     void saveNotificationSettings(nextSettings);
   };
 
@@ -327,7 +315,7 @@ export default function NotificationSettingsScreen({ navigation }: any) {
       </View>
 
       <SectionList
-        sections={SECTIONS}
+        sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         renderSectionHeader={({ section: { title } }) => (
@@ -339,12 +327,12 @@ export default function NotificationSettingsScreen({ navigation }: any) {
           <View style={styles.topSection}>
             <Text style={styles.topText}>Manage how and when you receive notifications</Text>
             <View style={styles.buttonRow}>
-              <TouchableOpacity style={styles.quickBtn} onPress={enableAll} disabled={saving || loading}>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => setAllVisible(true)} disabled={saving || loading}>
                 <Text style={styles.quickBtnText}>Enable All</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.quickBtn, styles.quickBtnSecondary]}
-                onPress={disableAll}
+                onPress={() => setAllVisible(false)}
                 disabled={saving || loading}
               >
                 <Text style={[styles.quickBtnText, styles.quickBtnTextSecondary]}>Disable All</Text>
@@ -367,7 +355,7 @@ export default function NotificationSettingsScreen({ navigation }: any) {
               <View style={styles.infoContent}>
                 <Text style={styles.infoTitle}>Push Notifications</Text>
                 <Text style={styles.infoText}>
-                  To receive push notifications, enable them in your device settings for the NLBB app.
+                  Turning an alert off only stops the push. It still appears in your in-app notifications. Push alerts also need to be allowed in your device settings.
                 </Text>
               </View>
             </View>

@@ -149,8 +149,13 @@ export const authApi = {
   refresh: (payload: { refreshToken: string }) =>
     requestAuth<Omit<AuthSessionResponse, 'user'>>('auth/refresh', payload),
   logout: () => apiClient.post<{ revoked: boolean }>('auth/logout'),
-  logoutWithAccessToken: (accessToken: string) =>
-    requestAuthWithBearer<{ revoked: boolean }>('auth/logout', accessToken),
+  /** Revokes the session; pass this device's push token so it stops receiving the user's pushes. */
+  logoutWithAccessToken: (accessToken: string, pushToken?: string | null) =>
+    requestAuthWithBearer<{ revoked: boolean }>(
+      'auth/logout',
+      accessToken,
+      pushToken ? { pushToken } : undefined
+    ),
   changePassword: (payload: { currentPassword: string; newPassword: string }) =>
     apiClient.post<{ updated: boolean }>('auth/change-password', payload),
   uploadAvatar: (payload: { dataUri: string }) =>

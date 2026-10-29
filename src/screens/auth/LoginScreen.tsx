@@ -7,7 +7,6 @@ import { AuthScreenLayout, NLBBButton, NLBBInput, NLBBCard } from '../../compone
 import LegalAgreementText from '../../components/LegalAgreementText';
 import { ColorPalette, Fonts } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
-import { getDemoCredentialsHint } from '../../lib/demo/demoSession';
 import { ENABLE_DEMO_MODE } from '../../lib/demo/config';
 
 const showDemoLogin = __DEV__ && ENABLE_DEMO_MODE;
@@ -122,8 +121,20 @@ export default function LoginScreen({ navigation, route }: any) {
             {showDemoLogin ? (
               <View style={styles.demoBox}>
                 <Text style={styles.demoLabel}>Try demo mode (offline)</Text>
-                <Text style={styles.demoHint}>Provider: {getDemoCredentialsHint('provider')}</Text>
+                <Text style={styles.demoHint}>
+                  Customer or provider · password demo1234
+                </Text>
                 <View style={styles.demoBtns}>
+                  <TouchableOpacity
+                    style={styles.demoBtn}
+                    onPress={() => {
+                      setRole('customer');
+                      setEmail('demo@customer.com');
+                      setPassword('demo1234');
+                    }}
+                  >
+                    <Text style={styles.demoBtnText}>Fill customer demo</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.demoBtn}
                     onPress={() => {

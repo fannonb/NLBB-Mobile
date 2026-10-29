@@ -1,0 +1,68 @@
+appId: com.nlbb.mobile
+name: Phone guest screenshots (Play Store)
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: ".*(Next|Skip|Find local services|Discover beauty near you|Browse as Guest|Home|Explore|Search barbers).*"
+    timeout: 90000
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+- runFlow:
+    when:
+      visible: "Next"
+    commands:
+      - tapOn: "Next"
+      - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: "Next"
+          commands:
+            - tapOn: "Next"
+            - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: "Browse as Guest"
+          commands:
+            - tapOn: "Browse as Guest"
+- runFlow: _shared/finish-onboarding.yaml
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- extendedWaitUntil:
+    visible:
+      text: ".*(Discover beauty near you|Home|Services|Near you|Explore|Search barbers).*"
+    timeout: 45000
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- takeScreenshot: phone_01_guest_home
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- tapOn: "Explore"
+- waitForAnimationToEnd
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- takeScreenshot: phone_02_guest_explore
+- runFlow:
+    when:
+      visible: "Obongita Hair Den"
+    commands:
+      - tapOn: "Obongita Hair Den"
+      - waitForAnimationToEnd
+      - runFlow: _shared/dismiss-system-dialogs.yaml
+      - takeScreenshot: phone_03_provider_details
+      - back
+- runFlow:
+    when:
+      visible: "Fade Masters Barbershop"
+    commands:
+      - tapOn: "Fade Masters Barbershop"
+      - waitForAnimationToEnd
+      - runFlow: _shared/dismiss-system-dialogs.yaml
+      - takeScreenshot: phone_03_provider_details
+      - back
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- tapOn: "Profile"
+- waitForAnimationToEnd
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- takeScreenshot: phone_05_guest_profile

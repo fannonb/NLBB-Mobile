@@ -15,6 +15,7 @@ import { toProviderAppointmentCard } from '../../lib/api/bookings';
 import { isApiClientError } from '../../lib/api/client';
 import { providerManagementApi } from '../../lib/api/providerManagement';
 import { subscriptionsApi } from '../../lib/api/subscriptions';
+import { isSubscriptionEffectivelyActive, subscriptionPauseMessage } from '../../lib/subscriptionAccess';
 import { useAuthStore } from '../../store/authStore';
 import { openPhoneNumber, openWhatsAppContact } from '../../lib/contactActions';
 import type { Subscription } from '../../types';
@@ -405,6 +406,7 @@ export default function DashboardScreen({ navigation }: any) {
   const hasLoadedProfile = useRef(false);
   const [togglingOpen, setTogglingOpen] = useState(false);
   const [subscriptionActive, setSubscriptionActive] = useState(false);
+  const [subscriptionNote, setSubscriptionNote] = useState<string | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -413,12 +415,7 @@ export default function DashboardScreen({ navigation }: any) {
 
   const week = useMemo(() => generateWeek(), []);
 
-  const isSubscriptionActive = (value: Subscription | null) => {
-    if (!value || value.status !== 'active') {
-      return false;
-    }
-    return new Date(value.renewalDate).getTime() > Date.now();
-  };
+  const isSubscriptionActive = (value: Subscription | null) => isSubscriptionEffectivelyActive(value);
 
   const loadDashboardData = useCallback(async (active?: { current: boolean }) => {
     const isActive = () => (active ? active.current : true);
@@ -435,6 +432,7 @@ export default function DashboardScreen({ navigation }: any) {
       if (!isActive()) return;
       const planActive = isSubscriptionActive(subscription);
       setSubscriptionActive(planActive);
+      setSubscriptionNote(subscriptionPauseMessage(subscription));
       if (provider) {
         updateProviderProfile({
           businessName: provider.name,
@@ -497,7 +495,7 @@ export default function DashboardScreen({ navigation }: any) {
     if (next && !subscriptionActive) {
       setToast({
         visible: true,
-        message: 'Activate your subscription before opening bookings.',
+        message: subscriptionNote ?? 'Activate your subscription before opening bookings.',
         type: 'error',
       });
       return;
@@ -516,7 +514,7 @@ export default function DashboardScreen({ navigation }: any) {
       updateProviderProfile({ isOpen: !next });
       const message =
         isApiClientError(error) && error.code === 'SUBSCRIPTION_INACTIVE'
-          ? 'Activate your subscription before opening bookings.'
+          ? subscriptionNote ?? 'Activate your subscription before opening bookings.'
           : isApiClientError(error)
             ? error.message
             : 'Could not update status. Try again.';
@@ -561,7 +559,11 @@ export default function DashboardScreen({ navigation }: any) {
               ]}
             />
             <Text style={styles.subChipText}>
-              {subscriptionActive ? 'Plan active' : 'Subscription required'}
+              {subscriptionActive
+                ? subscriptionNote
+                  ? 'Complimentary access'
+                  : 'Plan active'
+                : 'Subscription required'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -595,8 +597,12 @@ export default function DashboardScreen({ navigation }: any) {
               {!subscriptionActive
                 ? 'Pay your subscription to unlock bookings'
                 : providerProfile.isOpen
-                  ? 'Customers can see and book you now'
-                  : 'Hidden from new bookings until reopened'}
+                  ? subscriptionNote
+                    ? 'Complimentary access — customers can book you now'
+                    : 'Customers can see and book you now'
+                  : subscriptionNote
+                    ? 'Complimentary access — hidden until you reopen'
+                    : 'Hidden from new bookings until reopened'}
             </Text>
           </View>
         </View>

@@ -1,0 +1,40 @@
+appId: com.nlbb.mobile
+---
+# Best-effort dismissal of Android permission / system prompts.
+- runFlow:
+    when:
+      visible: "While using the app"
+    commands:
+      - tapOn: "While using the app"
+- runFlow:
+    when:
+      visible: "Allow"
+    commands:
+      - tapOn: "Allow"
+- runFlow:
+    when:
+      visible: "ONLY THIS TIME"
+    commands:
+      - tapOn: "ONLY THIS TIME"
+- runFlow:
+    when:
+      visible: "Don't allow"
+    commands:
+      - tapOn: "Don't allow"
+# Google Location Accuracy prompt (common on emulators).
+# Prefer "Turn on" — "No thanks" often leaves/reopens the dialog on API 35+.
+- runFlow:
+    when:
+      visible: "Turn on"
+    commands:
+      - tapOn: "Turn on"
+- runFlow:
+    when:
+      visible: "No thanks"
+    commands:
+      - tapOn: "No thanks"
+- runFlow:
+    when:
+      visible: "Location Accuracy"
+    commands:
+      - tapOn: "Turn on"

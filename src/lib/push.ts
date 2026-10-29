@@ -56,6 +56,7 @@ const parsePushNotificationPayload = (data: unknown): PushNotificationPayload | 
 
 let registeredPushToken: string | null = null;
 export const hasRegisteredPushToken = () => registeredPushToken !== null;
+export const getRegisteredPushToken = () => registeredPushToken;
 export const clearRegisteredPushToken = () => {
   registeredPushToken = null;
 };

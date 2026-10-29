@@ -4,6 +4,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  type ScrollViewInstance,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -38,7 +39,7 @@ type Props = {
  * Bottom-sheet Modal that lifts above the keyboard on iOS and Android.
  * Use for add/edit forms, auth gate, password change, etc.
  */
-const KeyboardAwareSheet = forwardRef<ScrollView, Props>(function KeyboardAwareSheet(
+const KeyboardAwareSheet = forwardRef<ScrollViewInstance, Props>(function KeyboardAwareSheet(
   {
     visible,
     onClose,
@@ -125,7 +126,7 @@ const styles = StyleSheet.create({
 export default KeyboardAwareSheet;
 
 /** Call from TextInput onFocus to keep the focused field above the keyboard. */
-export function useScrollFieldIntoView(scrollRef: RefObject<ScrollView | null>) {
+export function useScrollFieldIntoView(scrollRef: RefObject<ScrollViewInstance | null>) {
   return useCallback(() => {
     requestAnimationFrame(() => {
       scrollRef.current?.scrollToEnd({ animated: true });

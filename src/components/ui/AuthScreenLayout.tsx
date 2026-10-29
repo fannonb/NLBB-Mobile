@@ -4,11 +4,12 @@ import {
   Text,
   StyleSheet,
   Image,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brand, ColorPalette, Fonts } from '../../constants/theme';
 import { useThemedColors } from '../../hooks/useThemedColors';
+import { useAppStore } from '../../store/appStore';
 import KeyboardAwareScrollView from '../KeyboardAwareScrollView';
 
 interface AuthScreenLayoutProps {
@@ -96,11 +97,12 @@ export default function AuthScreenLayout({
 }: AuthScreenLayoutProps) {
   const insets = useSafeAreaInsets();
   const palette = useThemedColors();
+  const themeMode = useAppStore((state) => state.theme);
   const styles = useMemo(() => createLayoutStyles(palette), [palette]);
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={palette.bg} />
+      <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
       <View style={styles.circle1} />
       <View style={styles.circle2} />
 

@@ -25,7 +25,7 @@ Add this file at the project root:
 
 - `google-services.json`
 
-It should match the Firebase project used for `com.nlbb.mobile`.
+It should match the Firebase project used for `ke.co.nlbb`.
 
 ### 3. Expo credentials dashboard
 
@@ -33,7 +33,7 @@ In Expo / EAS credentials for the NLBB project:
 
 1. Open Android credentials
 2. Upload the FCM V1 service account key JSON
-3. Keep the app package as `com.nlbb.mobile`
+3. Keep the app package as `ke.co.nlbb`
 
 ## How to test after setup
 

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIn
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
+import { ImageSource, pickImageAsDataUri } from '../../lib/imagePicker';
 import { ColorPalette, Fonts, Radius, ShadowPalette } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { useAuthStore } from '../../store/authStore';
@@ -12,6 +12,10 @@ import CustomerAppHeader from '../../components/CustomerAppHeader';
 import LegalLinksSection from '../../components/LegalLinksSection';
 import AccountDangerZone from '../../components/AccountDangerZone';
 import DeleteAccountModal from '../../components/DeleteAccountModal';
+import AccountSettingsSection from '../../components/AccountSettingsSection';
+import ChangePasswordModal from '../../components/ChangePasswordModal';
+import ConfirmModal from '../../components/ConfirmModal';
+import { submitPasswordChange } from '../../lib/changePassword';
 import ActionSheetModal, { ActionSheetOption } from '../../components/ActionSheetModal';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
 import { useModalManager } from '../../hooks/useModalManager';
@@ -244,6 +248,8 @@ export default function ProfileScreen({ navigation }: any) {
   const [favoritesLoading, setFavoritesLoading] = useState(isLoggedIn);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
+  const [changePasswordVisible, setChangePasswordVisible] = useState(false);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const recentBooking = useMemo(
     () => (isLoggedIn && bookingRecords[0] ? toCustomerBookingCard(bookingRecords[0]) : null),
     [bookingRecords, isLoggedIn]
@@ -258,63 +264,23 @@ export default function ProfileScreen({ navigation }: any) {
   const userMeta = [user?.email, user?.phone].filter(Boolean).join(' | ');
   const avatarInitial = (user?.name?.trim()?.charAt(0) ?? 'U').toUpperCase();
 
-  const ensureMediaPermission = async (source: 'camera' | 'gallery') => {
-    if (source === 'camera') {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        showInfo('Permission Required', 'Camera permission is required to take a photo.');
-        return false;
-      }
-      return true;
-    }
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showInfo('Permission Required', 'Gallery permission is required to select a photo.');
-      return false;
-    }
-    return true;
-  };
-
-  const pickAndUploadAvatar = async (source: 'camera' | 'gallery') => {
-    const allowed = await ensureMediaPermission(source);
-    if (!allowed) {
-      return;
-    }
-
-    const pickerOptions: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-      base64: true,
-    };
-
+  const pickAndUploadAvatar = async (source: ImageSource) => {
     try {
-      const result =
-        source === 'camera'
-          ? await ImagePicker.launchCameraAsync(pickerOptions)
-          : await ImagePicker.launchImageLibraryAsync(pickerOptions);
-
-      if (result.canceled || result.assets.length === 0) {
+      const picked = await pickImageAsDataUri(source, { aspect: [1, 1] });
+      if (picked.status === 'permission-denied') {
+        showInfo('Permission Required', `${source === 'camera' ? 'Camera' : 'Gallery'} permission is required to update your photo.`);
         return;
       }
-
-      const asset = result.assets[0];
-      if (!asset.base64) {
+      if (picked.status === 'unreadable') {
         showError('Image Error', 'Could not process selected image. Please try again.');
         return;
       }
-
-      const mimeType =
-        asset.mimeType && asset.mimeType.startsWith('image/')
-          ? asset.mimeType
-          : asset.uri.toLowerCase().endsWith('.png')
-            ? 'image/png'
-            : 'image/jpeg';
+      if (picked.status !== 'picked') {
+        return;
+      }
 
       setUploadingAvatar(true);
-      await authApi.uploadAvatar({ dataUri: `data:${mimeType};base64,${asset.base64}` });
+      await authApi.uploadAvatar({ dataUri: picked.dataUri });
       await refreshCurrentUser({ force: true });
       showSuccess('Photo Updated', 'Profile photo updated.');
     } catch (error) {
@@ -542,14 +508,12 @@ export default function ProfileScreen({ navigation }: any) {
           )}
         </View>
 
+        <AccountSettingsSection
+          navigation={navigation}
+          onChangePasswordPress={() => setChangePasswordVisible(true)}
+        />
 
-
-        <TouchableOpacity
-          onPress={async () => {
-            await logout();
-          }}
-          style={styles.logoutBtn}
-        >
+        <TouchableOpacity onPress={() => setLogoutConfirmVisible(true)} style={styles.logoutBtn}>
           <Feather name="log-out" size={18} color={palette.error} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
@@ -562,6 +526,27 @@ export default function ProfileScreen({ navigation }: any) {
 
         <LegalLinksSection navigation={navigation} />
       </ScrollView>
+
+      <ChangePasswordModal
+        visible={changePasswordVisible}
+        onDismiss={() => setChangePasswordVisible(false)}
+        onChangePassword={submitPasswordChange}
+        onSuccess={showSuccess}
+        onError={showError}
+      />
+
+      <ConfirmModal
+        visible={logoutConfirmVisible}
+        title="Log out?"
+        message="You'll need to sign in again to book or see your favorites."
+        confirmLabel="Log Out"
+        isDanger
+        onCancel={() => setLogoutConfirmVisible(false)}
+        onConfirm={() => {
+          setLogoutConfirmVisible(false);
+          void logout();
+        }}
+      />
 
       <DeleteAccountModal
         visible={deleteVisible}

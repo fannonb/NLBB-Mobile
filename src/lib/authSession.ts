@@ -1,6 +1,67 @@
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { safeStorage } from './safeStorage';
 import { fetchWithApiBaseUrlFallback } from './api/baseUrl';
 import { User } from '../types';
+
+// Session tokens live in the Android Keystore / iOS Keychain. Web has no secure store,
+// so it keeps using AsyncStorage. Sessions written to AsyncStorage by older builds are
+// moved over on first read so the upgrade doesn't sign anyone out.
+const canUseSecureStore = Platform.OS !== 'web';
+
+const sessionStore = {
+  getItem: async (key: string): Promise<string | null> => {
+    if (!canUseSecureStore) {
+      return safeStorage.getItem(key);
+    }
+
+    try {
+      const secureValue = await SecureStore.getItemAsync(key);
+      if (secureValue !== null) {
+        return secureValue;
+      }
+    } catch (error) {
+      console.warn('[authSession] Secure store read failed:', error);
+      return null;
+    }
+
+    const legacyValue = await safeStorage.getItem(key);
+    if (legacyValue !== null) {
+      try {
+        await SecureStore.setItemAsync(key, legacyValue);
+        await safeStorage.removeItem(key);
+      } catch (error) {
+        console.warn('[authSession] Could not migrate session to secure store:', error);
+      }
+    }
+    return legacyValue;
+  },
+
+  setItem: async (key: string, value: string): Promise<void> => {
+    if (!canUseSecureStore) {
+      await safeStorage.setItem(key, value);
+      return;
+    }
+
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch (error) {
+      console.warn('[authSession] Secure store write failed:', error);
+    }
+  },
+
+  removeItem: async (key: string): Promise<void> => {
+    if (canUseSecureStore) {
+      try {
+        await SecureStore.deleteItemAsync(key);
+      } catch (error) {
+        console.warn('[authSession] Secure store delete failed:', error);
+      }
+    }
+    // Also clears any copy left behind by a pre-SecureStore build.
+    await safeStorage.removeItem(key);
+  },
+};
 
 export interface SessionTokens {
   accessToken: string;
@@ -80,7 +141,7 @@ export const getStoredSession = async (): Promise<SessionTokens | null> => {
 
   const startedAtVersion = sessionVersion;
   sessionLoadPromise = (async () => {
-    const raw = await safeStorage.getItem(AUTH_SESSION_KEY);
+    const raw = await sessionStore.getItem(AUTH_SESSION_KEY);
     if (!raw) {
       if (startedAtVersion === sessionVersion) {
         memorySession = null;
@@ -133,7 +194,7 @@ export const getStoredSessionMeta = async (): Promise<StoredSession | null> => {
     return null;
   }
 
-  const raw = await safeStorage.getItem(AUTH_SESSION_KEY);
+  const raw = await sessionStore.getItem(AUTH_SESSION_KEY);
   if (!raw) {
     memoryStoredSession = null;
     return null;
@@ -157,12 +218,12 @@ export const setStoredSession = async (session: SessionTokens | null): Promise<v
   memoryStoredSession = session ? normalizeSession(session) : null;
   if (!session) {
     lastPersistedActivityAt = 0;
-    await safeStorage.removeItem(AUTH_SESSION_KEY);
+    await sessionStore.removeItem(AUTH_SESSION_KEY);
     return;
   }
 
   lastPersistedActivityAt = Date.now();
-  await safeStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(memoryStoredSession));
+  await sessionStore.setItem(AUTH_SESSION_KEY, JSON.stringify(memoryStoredSession));
 };
 
 export const clearStoredSession = async (): Promise<void> => {
@@ -221,7 +282,7 @@ export const clearStoredAuth = async (): Promise<void> => {
   userVersion += 1;
   lastPersistedActivityAt = 0;
   await Promise.all([
-    safeStorage.removeItem(AUTH_SESSION_KEY),
+    sessionStore.removeItem(AUTH_SESSION_KEY),
     safeStorage.removeItem(AUTH_USER_KEY),
   ]);
 };
@@ -276,7 +337,7 @@ export const touchStoredSessionActivity = async (): Promise<void> => {
   }
 
   lastPersistedActivityAt = now;
-  await safeStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(next));
+  await sessionStore.setItem(AUTH_SESSION_KEY, JSON.stringify(next));
 };
 
 export const refreshStoredSession = async (): Promise<SessionTokens | null> => {

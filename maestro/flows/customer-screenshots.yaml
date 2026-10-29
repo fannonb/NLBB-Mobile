@@ -1,0 +1,97 @@
+appId: com.nlbb.mobile
+name: Customer demo screenshots (Play Store)
+tags:
+  - screenshots
+  - customer
+  - playstore
+---
+- clearState
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: ".*(Skip|Browse as Guest|Welcome back|Discover beauty).*"
+    timeout: 45000
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- runFlow: _shared/finish-onboarding.yaml
+
+# Open login from guest profile or onboarding sign-in path
+- runFlow:
+    when:
+      visible: "Profile"
+    commands:
+      - tapOn: "Profile"
+- runFlow:
+    when:
+      visible: "Sign in or create account"
+    commands:
+      - tapOn: "Sign in or create account"
+- runFlow:
+    when:
+      visible: "Sign in"
+    commands:
+      - tapOn: "Sign in"
+- runFlow:
+    when:
+      visible: "Already have an account? Sign in"
+    commands:
+      - tapOn: "Already have an account? Sign in"
+
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 20000
+- takeScreenshot: ${DEVICE_LABEL}_06_login
+
+# Requires EXPO_PUBLIC_ENABLE_DEMO_MODE=true in a __DEV__ build
+- runFlow:
+    when:
+      visible: "Fill customer demo"
+    commands:
+      - tapOn: "Fill customer demo"
+- runFlow:
+    when:
+      notVisible: "Fill customer demo"
+    commands:
+      - tapOn: "Customer"
+      - tapOn: "Email"
+      - eraseText
+      - inputText: "demo@customer.com"
+      - tapOn: "Password"
+      - eraseText
+      - inputText: "demo1234"
+
+- tapOn: "Sign In"
+- extendedWaitUntil:
+    visible:
+      text: ".*(Home|Search barbers|Services|Near you|Favourites).*"
+    timeout: 25000
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- takeScreenshot: ${DEVICE_LABEL}_07_customer_home
+
+- tapOn: "Explore"
+- waitForAnimationToEnd
+- takeScreenshot: ${DEVICE_LABEL}_08_customer_explore
+
+- runFlow:
+    when:
+      visible: "Fade Masters Barbershop"
+    commands:
+      - tapOn: "Fade Masters Barbershop"
+      - waitForAnimationToEnd
+      - takeScreenshot: ${DEVICE_LABEL}_09_customer_provider
+      - runFlow:
+          when:
+            visible: "Book visit"
+          commands:
+            - tapOn: "Book visit"
+            - waitForAnimationToEnd
+            - takeScreenshot: ${DEVICE_LABEL}_10_booking_sheet
+
+- tapOn:
+    text: "Bookings"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: ${DEVICE_LABEL}_11_customer_bookings
+
+- tapOn: "Profile"
+- waitForAnimationToEnd
+- takeScreenshot: ${DEVICE_LABEL}_12_customer_profile

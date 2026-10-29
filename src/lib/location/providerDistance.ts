@@ -22,8 +22,12 @@ export const calculateDistanceKm = (from: Coordinates, to: Coordinates) => {
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+// Beyond this the user is clearly not near the provider (location off, travelling, or an
+// emulator's default GPS), so a label like "15451 km" only adds noise.
+export const MAX_DISPLAY_DISTANCE_KM = 100;
+
 export const formatDistanceLabel = (distanceKm: number) => {
-  if (!Number.isFinite(distanceKm) || distanceKm < 0) {
+  if (!Number.isFinite(distanceKm) || distanceKm < 0 || distanceKm > MAX_DISPLAY_DISTANCE_KM) {
     return undefined;
   }
 

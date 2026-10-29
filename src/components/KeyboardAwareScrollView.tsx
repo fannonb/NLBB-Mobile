@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  type ScrollViewInstance,
   StyleSheet,
   ViewStyle,
   type ScrollViewProps,
@@ -26,7 +27,7 @@ type Props = ScrollViewProps & {
  * Full-screen / in-page form scroll container that keeps focused inputs visible
  * above the keyboard on iOS and Android.
  */
-const KeyboardAwareScrollView = forwardRef<ScrollView, Props>(function KeyboardAwareScrollView(
+const KeyboardAwareScrollView = forwardRef<ScrollViewInstance, Props>(function KeyboardAwareScrollView(
   {
     children,
     bottomPadding = 24,

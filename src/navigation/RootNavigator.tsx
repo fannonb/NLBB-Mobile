@@ -117,6 +117,56 @@ const ProviderOnlyRoute = ({ component: Component, ...props }: { component: Reac
   return <Component {...props} />;
 };
 
+// Account settings screens shared by customers and providers.
+const SignedInRoute = ({ component: Component, ...props }: { component: React.ComponentType<any>; [key: string]: any }) => {
+  const user = useAuthStore((state) => state.user);
+  const isReady = useAuthStore((state) => state.isReady);
+  const theme = useAppStore((state) => state.theme);
+  const colors = useMemo(() => getThemeColors(theme), [theme]);
+
+  useEffect(() => {
+    if (isReady && !user) {
+      props.navigation.replace('CustomerApp');
+    }
+  }, [isReady, props.navigation, user]);
+
+  if (!isReady || !user) {
+    return <RouteLoadingState colors={colors} />;
+  }
+
+  return <Component {...props} />;
+};
+
+const AdminOnlyRoute = ({ component: Component, ...props }: { component: React.ComponentType<any>; [key: string]: any }) => {
+  const user = useAuthStore((state) => state.user);
+  const isReady = useAuthStore((state) => state.isReady);
+  const theme = useAppStore((state) => state.theme);
+  const colors = useMemo(() => getThemeColors(theme), [theme]);
+
+  useEffect(() => {
+    if (!isReady || user?.role === 'admin') {
+      return;
+    }
+    if (user?.role === 'provider') {
+      props.navigation.replace('ProviderApp');
+    } else {
+      props.navigation.replace('CustomerApp');
+    }
+  }, [isReady, props.navigation, user?.role]);
+
+  if (!isReady || user?.role !== 'admin') {
+    return <RouteLoadingState colors={colors} />;
+  }
+
+  return <Component {...props} />;
+};
+
+const withSignedInRoute = (Component: React.ComponentType<any>) => (props: any) =>
+  <SignedInRoute component={Component} {...props} />;
+
+const withAdminOnlyRoute = (Component: React.ComponentType<any>) => (props: any) =>
+  <AdminOnlyRoute component={Component} {...props} />;
+
 const withGuestOrCustomerRoute = (Component: React.ComponentType<any>) => (props: any) =>
   <GuestOrCustomerRoute component={Component} {...props} />;
 
@@ -129,8 +179,9 @@ const GuardedNotificationsScreen = withGuestOrCustomerRoute(NotificationsScreen)
 const GuardedFavoritesScreen = withGuestOrCustomerRoute(FavoritesScreen);
 const GuardedWriteReviewScreen = withGuestOrCustomerRoute(WriteReviewScreen);
 const GuardedEditProfileScreen = withGuestOrCustomerRoute(EditProfileScreen);
-const GuardedDarkModeScreen = withGuestOrCustomerRoute(DarkModeScreen);
-const GuardedNotificationSettingsScreen = withGuestOrCustomerRoute(NotificationSettingsScreen);
+const GuardedDarkModeScreen = withSignedInRoute(DarkModeScreen);
+const GuardedNotificationSettingsScreen = withSignedInRoute(NotificationSettingsScreen);
+const GuardedAdminTabNavigator = withAdminOnlyRoute(AdminTabNavigator);
 
 const GuardedProviderTabNavigator = withProviderOnlyRoute(ProviderTabNavigator);
 const GuardedAppointmentDetailScreen = withProviderOnlyRoute(AppointmentDetailScreen);
@@ -183,7 +234,7 @@ export default function RootNavigator() {
         <Stack.Screen name="ProviderReviews" component={GuardedProviderReviewsScreen} />
         <Stack.Screen name="ProviderNotifications" component={GuardedProviderNotificationsScreen} />
 
-        <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
+        <Stack.Screen name="AdminApp" component={GuardedAdminTabNavigator} />
       </Stack.Navigator>
       {portalReady ? <AuthGateSheet /> : null}
       {portalReady ? <BookingSheet /> : null}

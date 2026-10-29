@@ -115,7 +115,7 @@ export default function NLBBButton({
     }).start();
   };
 
-  const flattenedStyle = style ? StyleSheet.flatten(style) : {};
+  const flattenedStyle: ViewStyle = (style ? StyleSheet.flatten(style) : null) ?? {};
   const {
     width,
     height,

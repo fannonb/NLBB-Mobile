@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Image,
   ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -28,7 +27,8 @@ import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { Provider } from '../../types';
 
-import { coalesceImageUri } from '../../lib/config';
+import ProviderCoverImage from '../../components/ProviderCoverImage';
+import { formatRatingSummary } from '../../lib/ratingLabel';
 
 function createExploreStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
@@ -108,7 +108,7 @@ function ProviderListCard({
 }) {
   return (
     <TouchableOpacity onPress={onPress} style={styles.listCard} activeOpacity={0.85}>
-      <Image source={{ uri: coalesceImageUri(provider.coverImage) }} style={styles.listImg} />
+      <ProviderCoverImage uri={provider.coverImage} category={provider.category} style={styles.listImg} iconSize={28} />
       <View style={styles.listInfo}>
         <View style={styles.listTop}>
           <Text style={styles.listName} numberOfLines={1}>{provider.name}</Text>
@@ -118,7 +118,7 @@ function ProviderListCard({
         <View style={styles.listMeta}>
           <View style={styles.metaItem}>
             <Feather name="star" size={11} color={palette.gold} />
-            <Text style={styles.metaText}>{provider.rating} ({provider.reviewCount})</Text>
+            <Text style={styles.metaText}>{formatRatingSummary(provider.rating, provider.reviewCount)}</Text>
           </View>
           <View style={styles.dot} />
           <View style={styles.metaItem}>
@@ -277,10 +277,10 @@ export default function ExploreScreen({ navigation, route }: any) {
             <Text style={styles.resultCount}>
               {`${filtered.length} provider${filtered.length !== 1 ? 's' : ''} found`}
             </Text>
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
-          loading ? null : (
+          loading ? undefined : (
             <EmptyState
               icon="search"
               title="No providers found"

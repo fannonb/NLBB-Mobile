@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,9 +20,6 @@ import { Category, Provider } from '../../types';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
-
-const SCREEN_W = Dimensions.get('window').width;
-const TILE_W = (SCREEN_W - 48 - 20) / 3;
 
 function createAllServicesStyles(p: ColorPalette, s: ShadowPalette) {
   return StyleSheet.create({
@@ -80,7 +76,7 @@ function createAllServicesStyles(p: ColorPalette, s: ShadowPalette) {
       marginBottom: 10,
     },
     catCell: {
-      width: TILE_W,
+      flex: 1,
     },
     loadingWrap: {
       flex: 1,

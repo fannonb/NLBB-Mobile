@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import { ImageStyle, StyleSheet, TextStyle, ViewStyle } from 'react-native';
 import type { ColorPalette, ShadowPalette } from '../constants/theme';
 import { useThemedColors, useThemedShadows } from './useThemedColors';
 
@@ -7,7 +7,9 @@ import { useThemedColors, useThemedShadows } from './useThemedColors';
  * Rebuilds a StyleSheet whenever light/dark theme changes.
  * Define `factory` at module scope so it stays stable: `function createStyles(p, s) { return StyleSheet.create({...}); }`
  */
-export function useThemedStylesheet<T extends StyleSheet.NamedStyles<T>>(
+type NamedStyles<T> = { [K in keyof T]: ViewStyle | TextStyle | ImageStyle };
+
+export function useThemedStylesheet<T extends NamedStyles<T>>(
   factory: (palette: ColorPalette, shadow: ShadowPalette) => T
 ): T {
   const palette = useThemedColors();

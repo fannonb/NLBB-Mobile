@@ -30,7 +30,7 @@ const LIGHT_COLORS = {
   // Text — warm brown tones
   textPrimary: '#13100A',
   textSecondary: '#5A5040',
-  textMuted: '#9A8C78',
+  textMuted: '#75685A', // 5.3:1 on bg (WCAG AA); was #9A8C78 at 3.2:1
 
   // Status
   success: '#1A9E68',
@@ -66,7 +66,7 @@ const DARK_COLORS: ColorPalette = {
 
   textPrimary: '#F9FAFB',
   textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
+  textMuted: '#8B93A1', // 5.9:1 on card (WCAG AA); was #6B7280 at 3.8:1
 
   success: '#34D399',
   error: '#F87171',

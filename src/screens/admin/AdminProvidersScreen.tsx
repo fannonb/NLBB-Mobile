@@ -34,6 +34,8 @@ const STATUS_COLORS: Record<AdminProviderStatus, string> = {
 const SUB_COLORS: Record<string, string> = {
   active: Colors.success,
   expired: Colors.error,
+  paused: Colors.warning,
+  complimentary: Colors.warning,
   none: Colors.textMuted,
 };
 

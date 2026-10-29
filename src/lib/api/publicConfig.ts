@@ -5,6 +5,7 @@ export interface PublicReleaseConfig {
   featureFlags: {
     paymentsEnabled: boolean;
     mpesaEnabled: boolean;
+    subscriptionsPaused?: boolean;
   };
 }
 

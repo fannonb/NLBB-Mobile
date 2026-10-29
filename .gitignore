@@ -41,6 +41,9 @@ yarn-error.*
 .env
 .env*.local
 
+# Maestro screenshot output
+maestro/output/
+
 # typescript
 *.tsbuildinfo
 
@@ -56,3 +59,13 @@ yarn-error.*
 # non-app workspaces
 /backend/
 /web/
+
+# Build outputs and signing material (never commit)
+*.apk
+*.aab
+tmp-signing/
+.gradle-user/
+
+# Local credentials and device dumps
+TEST_CREDENTIALS.md
+window_dump.xml

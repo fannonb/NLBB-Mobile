@@ -2,7 +2,7 @@ import { apiClient } from './client';
 import { normalizeAvatarRecord } from '../media';
 
 export type AdminProviderStatus = 'pending' | 'approved' | 'suspended';
-export type AdminProviderSubscriptionStatus = 'active' | 'expired' | 'none';
+export type AdminProviderSubscriptionStatus = 'active' | 'expired' | 'paused' | 'complimentary' | 'none';
 export type AdminUserStatus = 'active' | 'disabled';
 export type AdminUserRole = 'customer' | 'provider' | 'admin';
 

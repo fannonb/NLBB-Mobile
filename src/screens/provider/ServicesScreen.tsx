@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  type ScrollViewInstance,
   TouchableOpacity,
   TextInput,
   Switch,
@@ -180,7 +181,7 @@ export default function ServicesScreen({ navigation }: any) {
   const styles = useMemo(() => createServicesStyles(palette, shadow), [palette, shadow]);
   const consumeAddService = useProviderAddStore((s) => s.consumeAddService);
   const canGoBack = navigation.canGoBack?.() ?? false;
-  const modalScrollRef = useRef<ScrollView>(null);
+  const modalScrollRef = useRef<ScrollViewInstance>(null);
   const scrollFormFieldIntoView = useScrollFieldIntoView(modalScrollRef);
 
   const [services, setServices] = useState<ProviderService[]>([]);

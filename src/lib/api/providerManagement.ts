@@ -41,6 +41,7 @@ export type ProviderProfilePayload = {
   instagram?: string;
   facebook?: string;
   mpesaPhone?: string;
+  ownerName?: string;
 };
 
 export type ProviderRegistrationDetailsPayload = {

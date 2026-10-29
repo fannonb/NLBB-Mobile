@@ -5,7 +5,7 @@ import {
   StyleProp,
   StyleSheet,
   ViewStyle,
-  type TextInput as TextInputType,
+  type TextInputInstance,
 } from 'react-native';
 
 type InputFocusWrapProps = {
@@ -25,7 +25,7 @@ const isTextInputElement = (child: React.ReactElement) => {
  * native TextInput hit-box only covers the left/text portion (common on Android).
  */
 export default function InputFocusWrap({ style, disabled, children }: InputFocusWrapProps) {
-  const inputRef = useRef<TextInputType | null>(null);
+  const inputRef = useRef<TextInputInstance | null>(null);
   const flatStyle = StyleSheet.flatten(style) ?? {};
   const isRow = (flatStyle.flexDirection ?? 'column') === 'row';
 
@@ -35,15 +35,15 @@ export default function InputFocusWrap({ style, disabled, children }: InputFocus
     }
 
     const element = child as React.ReactElement<Record<string, unknown>>;
-    const existingRef = (element as React.ReactElement & { ref?: React.Ref<TextInputType | null> }).ref;
+    const existingRef = (element as React.ReactElement & { ref?: React.Ref<TextInputInstance | null> }).ref;
 
     return React.cloneElement(element, {
-      ref: (node: TextInputType | null) => {
+      ref: (node: TextInputInstance | null) => {
         inputRef.current = node;
         if (typeof existingRef === 'function') {
           existingRef(node);
         } else if (existingRef && typeof existingRef === 'object') {
-          (existingRef as React.MutableRefObject<TextInputType | null>).current = node;
+          (existingRef as React.MutableRefObject<TextInputInstance | null>).current = node;
         }
       },
       style: [

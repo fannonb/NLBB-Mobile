@@ -17,7 +17,7 @@ interface DeleteAccountModalProps {
   visible: boolean;
   role: 'customer' | 'provider';
   onDismiss: () => void;
-  onDeleteAccount: (password: string) => Promise<{ success: boolean; errorMessage?: string }>;
+  onDeleteAccount: (password: string) => Promise<{ success: boolean; error?: string }>;
   onSuccess?: () => void;
 }
 
@@ -166,7 +166,7 @@ export default function DeleteAccountModal({
     setBusy(false);
 
     if (!result.success) {
-      setError(result.errorMessage ?? 'Could not delete your account. Please try again.');
+      setError(result.error ?? 'Could not delete your account. Please try again.');
       return;
     }
 

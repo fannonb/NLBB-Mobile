@@ -7,7 +7,11 @@ import {
   TouchableOpacity,
   Image,
   Animated,
+  Share,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useIsFocused } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackModalHost from '../../components/FeedbackModalHost';
@@ -25,6 +29,7 @@ import { normalizeFacebookLink, normalizeInstagramLink } from '../../lib/socialL
 import { Provider, Review } from '../../types';
 
 import { coalesceImageUri, DEFAULT_PLACEHOLDER_IMAGE, isValidImageUri } from '../../lib/config';
+import { formatReviewCount } from '../../lib/ratingLabel';
 
 export default function ProviderDetailsScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
@@ -38,6 +43,10 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
   const { openBooking } = useOpenBooking();
   const { modal, showError, showInfo, hideModal } = useModalManager();
   const scrollY = useRef(new Animated.Value(0)).current;
+  const isFocused = useIsFocused();
+  const themeMode = useAppStore((state) => state.theme);
+  // The cover photo sits under the status bar until the solid header fades in (~220px).
+  const [heroUnderStatusBar, setHeroUnderStatusBar] = useState(true);
   const [provider, setProvider] = useState<Provider | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +114,10 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
 
   const selectedService = (hydratedProvider?.services ?? []).find((service) => service.id === selectedServiceId);
   const isFavorited = hydratedProvider ? isLoggedIn && favorites.includes(hydratedProvider.id) : false;
-  const distanceLabel = hydratedProvider?.distance
+  const isOutOfDisplayRange = typeof hydratedProvider?.distanceKm === 'number' && !hydratedProvider.distance;
+  const distanceLabel = isOutOfDisplayRange
+    ? undefined
+    : hydratedProvider?.distance
     ?? (hydratedProvider?.coordinates
       ? currentLocation.status === 'loading'
         ? 'Calculating distance'
@@ -115,14 +127,14 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
       : 'Location pending');
 
   const handleBook = () => {
-    if (!selectedService || !hydratedProvider) return;
+    if (!hydratedProvider) return;
     openBooking({
       providerId: hydratedProvider.id,
       providerName: hydratedProvider.name,
       providerPhone: hydratedProvider.phone,
       providerWhatsapp: hydratedProvider.whatsapp,
       services: hydratedProvider.services,
-      preselectedServiceId: selectedService.id,
+      preselectedServiceId: selectedService?.id,
     });
   };
 
@@ -268,8 +280,18 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
     extrapolate: 'clamp',
   });
 
+  const handleShare = () => {
+    const parts = [hydratedProvider.name, hydratedProvider.category, hydratedProvider.location].filter(Boolean);
+    void Share.share({ message: `${parts.join(' · ')}
+
+Find them on NLBB.` }).catch(() => undefined);
+  };
+
   return (
     <View style={styles.container}>
+      {isFocused ? (
+        <StatusBar style={heroUnderStatusBar || themeMode === 'dark' ? 'light' : 'dark'} />
+      ) : null}
       {/* Floating solid header that fades in */}
       <Animated.View
         style={[
@@ -299,7 +321,12 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
         scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
+          {
+            useNativeDriver: true,
+            listener: (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+              setHeroUnderStatusBar(event.nativeEvent.contentOffset.y < 220);
+            },
+          }
         )}
       >
         <View style={styles.heroContainer}>
@@ -328,12 +355,17 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
             ]}
           />
           <View style={styles.heroOverlay} />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']}
+            style={[styles.heroTopShade, { height: insets.top + 72 }]}
+            pointerEvents="none"
+          />
           <View style={[styles.topNav, { paddingTop: insets.top + 8 }]}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navBtn}>
               <Feather name="arrow-left" size={20} color="#fff" />
             </TouchableOpacity>
             <View style={styles.navRight}>
-              <TouchableOpacity style={styles.navBtn}>
+              <TouchableOpacity style={styles.navBtn} onPress={handleShare}>
                 <Feather name="share-2" size={18} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
@@ -371,14 +403,20 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
           <View style={styles.metaRow}>
             <View style={styles.ratingRow}>
               <Feather name="star" size={14} color={palette.gold} />
-              <Text style={styles.rating}>{hydratedProvider.rating}</Text>
-              <Text style={styles.reviewCount}>({hydratedProvider.reviewCount} reviews)</Text>
+              {hydratedProvider.reviewCount > 0 ? (
+                <>
+                  <Text style={styles.rating}>{hydratedProvider.rating}</Text>
+                  <Text style={styles.reviewCount}>({formatReviewCount(hydratedProvider.reviewCount)})</Text>
+                </>
+              ) : (
+                <Text style={styles.rating}>New · no reviews yet</Text>
+              )}
             </View>
             <View style={styles.separator} />
             <View style={styles.locationRow}>
               <Feather name="map-pin" size={12} color={palette.gold} />
               <Text style={styles.locationText} numberOfLines={2}>
-                {hydratedProvider.location} · {distanceLabel}
+                {distanceLabel ? `${hydratedProvider.location} · ${distanceLabel}` : hydratedProvider.location}
               </Text>
             </View>
           </View>
@@ -629,10 +667,9 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
           </Text>
         </View>
         <TouchableOpacity
-          style={[styles.bookBtn, !selectedService && styles.bookBtnDisabled]}
+          style={styles.bookBtn}
           onPress={handleBook}
           activeOpacity={0.85}
-          disabled={!selectedService}
         >
           <Text style={styles.bookBtnText}>{isLoggedIn ? 'Book visit' : 'Sign in to book'}</Text>
           <Feather name="arrow-right" size={16} color={palette.bg} />
@@ -674,6 +711,7 @@ function createProviderDetailsStyles(p: ColorPalette, s: ShadowPalette) {
   heroContainer: { height: 320, position: 'relative' },
   heroImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(26,26,26,0.3)' },
+  heroTopShade: { position: 'absolute', top: 0, left: 0, right: 0 },
   topNav: {
     position: 'absolute',
     top: 0,
@@ -998,7 +1036,6 @@ function createProviderDetailsStyles(p: ColorPalette, s: ShadowPalette) {
     gap: 8,
     ...s.gold,
   },
-  bookBtnDisabled: { opacity: 0.4 },
   bookBtnText: { color: p.bg, fontFamily: Fonts.sansBold, fontSize: 14, fontWeight: '700' },
   });
 }

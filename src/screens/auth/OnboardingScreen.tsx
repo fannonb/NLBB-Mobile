@@ -1,21 +1,21 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   TouchableOpacity,
-  Dimensions,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brand, ColorPalette, Fonts, ShadowPalette } from '../../constants/theme';
+import { MAX_CONTENT_WIDTH } from '../../constants/layout';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { NLBBButton } from '../../components/ui';
 import { markOnboardingComplete } from '../../lib/onboardingPreference';
-
-const { width } = Dimensions.get('window');
 
 const SLIDES = [
   {
@@ -43,9 +43,24 @@ export default function OnboardingScreen({ navigation }: any) {
   const palette = useThemedColors();
   const shadow = useThemedShadows();
   const styles = useMemo(() => createOnboardingStyles(palette, shadow), [palette, shadow]);
+  // Slide width must follow the viewport: the app is not orientation-locked, and on a
+  // tablet/landscape foldable the content column is narrower than the window.
+  const { width, height } = useWindowDimensions();
+  const slideWidth = Math.min(width, MAX_CONTENT_WIDTH);
+  // Landscape phones are only ~360-420dp tall: shrink the chrome instead of letting the
+  // slide content get squeezed into a scrollable sliver.
+  const compact = height < 560;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  // Re-anchor the carousel when the viewport changes (rotation, resize, fold/unfold).
+  useEffect(() => {
+    flatListRef.current?.scrollToOffset({
+      offset: currentIndex * slideWidth,
+      animated: false,
+    });
+  }, [currentIndex, slideWidth]);
 
   const finishOnboarding = async (destination: 'browse' | 'login') => {
     await markOnboardingComplete();
@@ -63,13 +78,13 @@ export default function OnboardingScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.heroHeader}>
+      <View style={[styles.heroHeader, compact && styles.heroHeaderCompact]}>
         <Image
           source={require('../../../assets/transparent_logo.png')}
-          style={styles.logo}
+          style={[styles.logo, compact && styles.logoCompact]}
           resizeMode="contain"
         />
-        <Text style={styles.tagline}>{Brand.tagline}</Text>
+        {compact ? null : <Text style={styles.tagline}>{Brand.tagline}</Text>}
       </View>
 
       <FlatList
@@ -80,15 +95,27 @@ export default function OnboardingScreen({ navigation }: any) {
         showsHorizontalScrollIndicator={false}
         scrollEnabled={false}
         keyExtractor={(item) => item.id}
+        getItemLayout={(_, index) => ({
+          length: slideWidth,
+          offset: slideWidth * index,
+          index,
+        })}
         renderItem={({ item }) => (
-          <View style={styles.slide}>
-            <View style={[styles.iconRing, shadow.gold]}>
-              <View style={styles.iconBadge}>
-                <Feather name={item.icon} size={32} color={palette.bg} />
+          <View style={[styles.slide, { width: slideWidth }]}>
+            {/* Scrollable so the slide never clips on short/landscape viewports. */}
+            <ScrollView
+              style={styles.slideScroll}
+              contentContainerStyle={styles.slideContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={[styles.iconRing, compact && styles.iconRingCompact, shadow.gold]}>
+                <View style={[styles.iconBadge, compact && styles.iconBadgeCompact]}>
+                  <Feather name={item.icon} size={compact ? 20 : 32} color={palette.bg} />
+                </View>
               </View>
-            </View>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.subtitle}>{item.subtitle}</Text>
+              <Text style={[styles.title, compact && styles.titleCompact]}>{item.title}</Text>
+              <Text style={[styles.subtitle, compact && styles.subtitleCompact]}>{item.subtitle}</Text>
+            </ScrollView>
           </View>
         )}
       />
@@ -102,21 +129,29 @@ export default function OnboardingScreen({ navigation }: any) {
         ))}
       </View>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
-        <NLBBButton
-          label={currentIndex === SLIDES.length - 1 ? 'Browse as Guest' : 'Next'}
-          onPress={goNext}
-          size="lg"
-          style={styles.nextBtn}
-        />
-        {currentIndex < SLIDES.length - 1 && (
+      <View
+        style={[
+          styles.footer,
+          compact && styles.footerCompact,
+          { paddingBottom: insets.bottom + (compact ? 12 : 24) },
+        ]}
+      >
+        <View style={[styles.footerActions, compact && styles.footerActionsCompact]}>
           <NLBBButton
-            label="Skip"
-            onPress={() => void finishOnboarding('browse')}
-            variant="ghost"
-            style={styles.skipBtn}
+            label={currentIndex === SLIDES.length - 1 ? 'Browse as Guest' : 'Next'}
+            onPress={goNext}
+            size={compact ? 'md' : 'lg'}
+            style={compact ? styles.nextBtnCompact : styles.nextBtn}
           />
-        )}
+          {currentIndex < SLIDES.length - 1 && (
+            <NLBBButton
+              label="Skip"
+              onPress={() => void finishOnboarding('browse')}
+              variant="ghost"
+              style={compact ? styles.skipBtnCompact : styles.skipBtn}
+            />
+          )}
+        </View>
         <TouchableOpacity onPress={() => void finishOnboarding('login')} style={styles.signInBtn}>
           <Text style={styles.signInText}>Already have an account? Sign in</Text>
         </TouchableOpacity>
@@ -136,10 +171,19 @@ function createOnboardingStyles(p: ColorPalette, s: ShadowPalette) {
       paddingTop: 16,
       paddingBottom: 8,
     },
+    heroHeaderCompact: {
+      paddingTop: 6,
+      paddingBottom: 4,
+    },
     logo: {
       width: 180,
       height: 70,
       marginBottom: 8,
+    },
+    logoCompact: {
+      width: 120,
+      height: 44,
+      marginBottom: 0,
     },
     tagline: {
       color: p.gold,
@@ -149,11 +193,20 @@ function createOnboardingStyles(p: ColorPalette, s: ShadowPalette) {
       textTransform: 'uppercase',
     },
     slide: {
-      width,
       flex: 1,
-      alignItems: 'center',
+    },
+    slideScroll: {
+      flex: 1,
+    },
+    slideContent: {
+      flexGrow: 1,
+      // Full width + stretch (not center) so long subtitles wrap inside the column
+      // instead of overflowing it; the text itself stays centred via textAlign.
+      width: '100%',
+      alignItems: 'stretch',
+      justifyContent: 'center',
       paddingHorizontal: 36,
-      paddingTop: 32,
+      paddingVertical: 24,
     },
     iconRing: {
       width: 88,
@@ -164,6 +217,13 @@ function createOnboardingStyles(p: ColorPalette, s: ShadowPalette) {
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 36,
+      alignSelf: 'center',
+    },
+    iconRingCompact: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      marginBottom: 14,
     },
     iconBadge: {
       width: 64,
@@ -174,6 +234,11 @@ function createOnboardingStyles(p: ColorPalette, s: ShadowPalette) {
       justifyContent: 'center',
       ...s.gold,
     },
+    iconBadgeCompact: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+    },
     title: {
       fontFamily: Fonts.serif,
       fontSize: 28,
@@ -181,6 +246,12 @@ function createOnboardingStyles(p: ColorPalette, s: ShadowPalette) {
       textAlign: 'center',
       marginBottom: 16,
       lineHeight: 34,
+      width: '100%',
+    },
+    titleCompact: {
+      fontSize: 21,
+      lineHeight: 26,
+      marginBottom: 8,
     },
     subtitle: {
       fontFamily: Fonts.sans,
@@ -188,6 +259,11 @@ function createOnboardingStyles(p: ColorPalette, s: ShadowPalette) {
       color: p.textSecondary,
       textAlign: 'center',
       lineHeight: 24,
+      width: '100%',
+    },
+    subtitleCompact: {
+      fontSize: 13,
+      lineHeight: 18,
     },
     dotsRow: {
       flexDirection: 'row',
@@ -211,11 +287,28 @@ function createOnboardingStyles(p: ColorPalette, s: ShadowPalette) {
       paddingHorizontal: 24,
       gap: 8,
     },
+    footerCompact: {
+      gap: 0,
+    },
+    footerActions: {
+      gap: 8,
+    },
+    footerActionsCompact: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: 10,
+    },
     nextBtn: {
       width: '100%',
     },
+    nextBtnCompact: {
+      flex: 2,
+    },
     skipBtn: {
       width: '100%',
+    },
+    skipBtnCompact: {
+      flex: 1,
     },
     signInBtn: {
       alignItems: 'center',

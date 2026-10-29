@@ -1,0 +1,93 @@
+appId: com.nlbb.mobile
+name: Provider demo screenshots (Play Store)
+tags:
+  - screenshots
+  - provider
+  - playstore
+---
+- clearState
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: ".*(Skip|Browse as Guest|Welcome back|Discover beauty).*"
+    timeout: 45000
+- runFlow: _shared/dismiss-system-dialogs.yaml
+
+# Prefer onboarding → Sign in, else Profile → Sign in
+- runFlow:
+    when:
+      visible: "Already have an account? Sign in"
+    commands:
+      - tapOn: "Already have an account? Sign in"
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+- runFlow:
+    when:
+      visible: "Browse as Guest"
+    commands:
+      - tapOn: "Browse as Guest"
+- runFlow:
+    when:
+      visible: "Profile"
+    commands:
+      - tapOn: "Profile"
+- runFlow:
+    when:
+      visible: "Sign in or create account"
+    commands:
+      - tapOn: "Sign in or create account"
+- runFlow:
+    when:
+      visible: "Sign in"
+    commands:
+      - tapOn: "Sign in"
+- runFlow:
+    when:
+      visible: "I'm a service provider"
+    commands:
+      - tapOn: "I'm a service provider"
+
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 20000
+- takeScreenshot: ${DEVICE_LABEL}_13_provider_login
+
+- runFlow:
+    when:
+      visible: "Fill provider demo"
+    commands:
+      - tapOn: "Fill provider demo"
+- runFlow:
+    when:
+      notVisible: "Fill provider demo"
+    commands:
+      - tapOn: "Provider"
+      - tapOn: "Email"
+      - eraseText
+      - inputText: "demo@provider.com"
+      - tapOn: "Password"
+      - eraseText
+      - inputText: "demo1234"
+
+- tapOn: "Sign In"
+- extendedWaitUntil:
+    visible:
+      text: ".*(Today|Review requests|This week|Pending|Confirmed).*"
+    timeout: 25000
+- runFlow: _shared/dismiss-system-dialogs.yaml
+- takeScreenshot: ${DEVICE_LABEL}_14_provider_today
+
+- tapOn: "Appointments"
+- waitForAnimationToEnd
+- takeScreenshot: ${DEVICE_LABEL}_15_provider_appointments
+
+- tapOn: "Services"
+- waitForAnimationToEnd
+- takeScreenshot: ${DEVICE_LABEL}_16_provider_services
+
+- tapOn: "Profile"
+- waitForAnimationToEnd
+- takeScreenshot: ${DEVICE_LABEL}_17_provider_profile
