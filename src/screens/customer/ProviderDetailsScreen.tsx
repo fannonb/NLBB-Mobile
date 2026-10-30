@@ -114,6 +114,8 @@ export default function ProviderDetailsScreen({ navigation, route }: any) {
     : hydratedProvider?.services ?? [];
 
   const selectedService = (hydratedProvider?.services ?? []).find((service) => service.id === selectedServiceId);
+  const pricedServices = (hydratedProvider?.services ?? []).filter((service) => service.isActive !== false && service.price > 0);
+  const startingPrice = pricedServices.length > 0 ? Math.min(...pricedServices.map((service) => service.price)) : null;
   const isFavorited = hydratedProvider ? isLoggedIn && favorites.includes(hydratedProvider.id) : false;
   const isOutOfDisplayRange = typeof hydratedProvider?.distanceKm === 'number' && !hydratedProvider.distance;
   const distanceLabel = isOutOfDisplayRange
@@ -662,9 +664,14 @@ Find them on NLBB.` }).catch(() => undefined);
 
       <View style={[styles.bookingFooter, { paddingBottom: insets.bottom + 12 }]}>
         <View>
-          <Text style={styles.bookingLabel}>{selectedService ? 'Selected service' : 'Choose a service'}</Text>
+          {/* Before a service is picked, show the lowest price so the bar still says something useful. */}
+          <Text style={styles.bookingLabel}>{selectedService ? 'Selected service' : 'Starting from'}</Text>
           <Text style={styles.bookingPrice}>
-            {selectedService ? `Ksh ${selectedService.price.toLocaleString()}` : '—'}
+            {selectedService
+              ? `Ksh ${selectedService.price.toLocaleString()}`
+              : startingPrice !== null
+                ? `Ksh ${startingPrice.toLocaleString()}`
+                : '—'}
           </Text>
         </View>
         <TouchableOpacity
@@ -672,7 +679,9 @@ Find them on NLBB.` }).catch(() => undefined);
           onPress={handleBook}
           activeOpacity={0.85}
         >
-          <Text style={styles.bookBtnText}>{isLoggedIn ? 'Book visit' : 'Sign in to book'}</Text>
+          <Text style={styles.bookBtnText}>
+            {!selectedService ? 'Choose a service' : isLoggedIn ? 'Book visit' : 'Sign in to book'}
+          </Text>
           <Feather name="arrow-right" size={16} color={palette.bg} />
         </TouchableOpacity>
       </View>
