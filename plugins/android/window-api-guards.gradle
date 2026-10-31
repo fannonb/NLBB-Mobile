@@ -1,0 +1,101 @@
+import com.android.build.api.instrumentation.AsmClassVisitorFactory
+import com.android.build.api.instrumentation.ClassContext
+import com.android.build.api.instrumentation.ClassData
+import com.android.build.api.instrumentation.FramesComputationMode
+import com.android.build.api.instrumentation.InstrumentationParameters
+import com.android.build.api.instrumentation.InstrumentationScope
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.Label
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
+
+/**
+ * Dependencies still need these APIs on Android 7–14. Android 15+ enforces
+ * edge-to-edge, so neither bar-color setters nor decor fitting should run there.
+ * Transform the packaged bytecode, including Maven AARs; editing node_modules
+ * source alone does not fix precompiled dependencies.
+ *
+ * Legacy calls deliberately remain behind an SDK < 35 check. This is a runtime
+ * compatibility fix, not a claim that Play's static scan will hide every warning.
+ */
+class NlbbWindowApiClassVisitor extends ClassVisitor {
+    private static final Set<String> SETTERS = [
+        'setStatusBarColor(I)V',
+        'setNavigationBarColor(I)V',
+        'setNavigationBarDividerColor(I)V',
+        'setDecorFitsSystemWindows(Z)V',
+        'setStatusBarContrastEnforced(Z)V',
+    ] as Set
+    private static final Set<String> GETTERS = [
+        'getStatusBarColor()I',
+        'getNavigationBarColor()I',
+        'getNavigationBarDividerColor()I',
+    ] as Set
+
+    NlbbWindowApiClassVisitor(ClassVisitor next) { super(Opcodes.ASM9, next) }
+
+    @Override
+    MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+        MethodVisitor next = super.visitMethod(access, name, descriptor, signature, exceptions)
+        return new MethodVisitor(Opcodes.ASM9, next) {
+            @Override
+            void visitMethodInsn(int opcode, String owner, String method, String desc, boolean isInterface) {
+                String key = method + desc
+                if (opcode != Opcodes.INVOKEVIRTUAL || owner != 'android/view/Window' ||
+                    (!SETTERS.contains(key) && !GETTERS.contains(key))) {
+                    super.visitMethodInsn(opcode, owner, method, desc, isInterface)
+                    return
+                }
+                Label modern = new Label()
+                Label done = new Label()
+                // Evaluate the original receiver/arguments exactly once, including
+                // their side effects, before branching. Both paths balance the stack.
+                super.visitFieldInsn(Opcodes.GETSTATIC, 'android/os/Build$VERSION', 'SDK_INT', 'I')
+                super.visitIntInsn(Opcodes.BIPUSH, 35)
+                super.visitJumpInsn(Opcodes.IF_ICMPGE, modern)
+                super.visitMethodInsn(opcode, owner, method, desc, isInterface)
+                super.visitJumpInsn(Opcodes.GOTO, done)
+                super.visitLabel(modern)
+                if (SETTERS.contains(key)) super.visitInsn(Opcodes.POP) // one int/boolean argument
+                // Preserve INVOKEVIRTUAL's null-receiver exception even when the
+                // deprecated operation itself is unnecessary on the modern OS.
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, 'java/util/Objects', 'requireNonNull',
+                    '(Ljava/lang/Object;)Ljava/lang/Object;', false)
+                super.visitInsn(Opcodes.POP)
+                if (GETTERS.contains(key)) super.visitInsn(Opcodes.ICONST_0)
+                super.visitLabel(done)
+            }
+        }
+    }
+}
+
+abstract class NlbbWindowApiVisitorFactory implements AsmClassVisitorFactory<InstrumentationParameters.None> {
+    @Override
+    ClassVisitor createClassVisitor(ClassContext context, ClassVisitor next) {
+        return new NlbbWindowApiClassVisitor(next)
+    }
+    @Override
+    boolean isInstrumentable(ClassData data) { return true }
+}
+
+androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+    variant.instrumentation.transformClassesWith(NlbbWindowApiVisitorFactory, InstrumentationScope.ALL) {}
+    variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COMPUTE_FRAMES_FOR_INSTRUMENTED_METHODS)
+}
+
+// Exercise the actual bytecode visitor against JVM fixtures, without a device.
+// These files live under build/, never under app/src and never in the APK.
+def verifyWindowGuards = tasks.register('verifyNlbbWindowApiGuards') {
+    inputs.files(fileTree(new File(rootDir.parentFile, 'plugins/android/fixtures')) { include '**/*.java' })
+    inputs.file(new File(rootDir.parentFile, 'plugins/android/window-api-guards.gradle'))
+    inputs.file(new File(rootDir.parentFile, 'plugins/android/test-window-api-guards.groovy'))
+    doLast {
+        def verify = new GroovyShell(this.class.classLoader).evaluate(
+            new File(rootDir.parentFile, 'plugins/android/test-window-api-guards.groovy'))
+        verify(NlbbWindowApiClassVisitor,
+            new File(rootDir.parentFile, 'plugins/android/fixtures'),
+            layout.buildDirectory.dir('nlbb-window-guard-tests').get().asFile)
+        logger.lifecycle('NLBB window API guards passed on Android API 24, 29, 30, 34, 35, 36, 37')
+    }
+}
+tasks.named('preBuild').configure { dependsOn(verifyWindowGuards) }

@@ -19,6 +19,8 @@ on:
       - src/**
       - tsconfig.json
       - assets/**
+      - plugins/**
+      - scripts/verify-android-release.py
 
 concurrency:
   group: mobile-preview-${{ github.ref }}

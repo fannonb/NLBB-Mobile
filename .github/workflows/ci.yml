@@ -30,3 +30,12 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Setup Java for native compatibility checks
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Verify Android window API compatibility
+        run: npm run test:android:guards

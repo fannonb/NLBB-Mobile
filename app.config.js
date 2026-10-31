@@ -15,7 +15,7 @@ module.exports = {
     name: 'NLBB',
     slug: 'nlbb',
     scheme: 'nlbb',
-    version: '1.0.3',
+    version: '1.0.4',
     // 'default' lets the app follow the device: Android 16 ignores portrait locks on
     // tablets/foldables anyway, so the UI is built to adapt instead of being locked.
     orientation: 'default',
@@ -42,7 +42,7 @@ module.exports = {
     },
     android: {
       package: 'ke.co.nlbb',
-      versionCode: 4,
+      versionCode: 5,
       usesCleartextTraffic: !isProduction,
       ...(hasGoogleServicesFile ? { googleServicesFile: './google-services.json' } : {}),
       adaptiveIcon: {
@@ -83,6 +83,7 @@ module.exports = {
       // Keep the generated Android theme free of Android 15's deprecated edge-to-edge
       // window parameters (see plugins/withEdgeToEdgeStyles.js).
       './plugins/withEdgeToEdgeStyles',
+      './plugins/withAndroidReleaseQuality',
     ],
     extra: {
       eas: {

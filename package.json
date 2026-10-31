@@ -1,8 +1,10 @@
 {
   "name": "nlbb",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "index.ts",
   "scripts": {
+    "eas-build-on-success": "node scripts/verify-eas-android-release.cjs",
+    "test:android:guards": "node scripts/test-android-window-guards.cjs",
     "start": "expo start --max-workers 1",
     "backend:dev": "npm --prefix backend run dev",
     "backend:dev:local": "npm --prefix backend run dev:local",

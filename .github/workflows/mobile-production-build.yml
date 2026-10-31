@@ -28,6 +28,9 @@ on:
       - src/**
       - tsconfig.json
       - assets/**
+      - plugins/**
+      - scripts/verify-android-release.py
+      - scripts/verify-eas-android-release.cjs
 
 jobs:
   build-production:
