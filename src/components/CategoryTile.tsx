@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAppStore } from '../store/appStore';
 import { Fonts } from '../constants/theme';
 import { getCategoryVisual } from '../constants/categoryVisuals';
 import { useThemedColors } from '../hooks/useThemedColors';
@@ -12,14 +13,15 @@ interface CategoryTileProps {
 
 export default function CategoryTile({ category, onPress }: CategoryTileProps) {
   const palette = useThemedColors();
+  const theme = useAppStore((state) => state.theme);
   const visual = getCategoryVisual(category.slug ?? category.name, category.icon);
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={styles.wrapper}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={styles.wrapper} accessibilityRole="button" accessibilityLabel={`Browse ${category.name}`}>
       <View
         style={[
           styles.tile,
-          { backgroundColor: visual.bg, borderColor: palette.borderLight },
+          { backgroundColor: theme === 'dark' ? palette.cardInner : visual.bg, borderColor: palette.borderLight },
         ]}
       >
         <View style={[styles.iconBadge, { backgroundColor: palette.card }]}>
@@ -54,7 +56,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: Fonts.sansBold,
     letterSpacing: 0.2,
     textAlign: 'center',

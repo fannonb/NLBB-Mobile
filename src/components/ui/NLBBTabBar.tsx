@@ -37,6 +37,7 @@ function createTabBarStyles(p: ColorPalette, s: ShadowPalette) {
       alignItems: 'center',
       justifyContent: 'center',
       gap: 4,
+      minHeight: 48,
       paddingTop: 4,
     },
     tabIndicator: {
@@ -51,7 +52,7 @@ function createTabBarStyles(p: ColorPalette, s: ShadowPalette) {
     },
     tabLabel: {
       fontFamily: Fonts.sansMedium,
-      fontSize: 10,
+      fontSize: 12,
     },
     tabLabelActive: {
       fontFamily: Fonts.sansBold,
@@ -107,7 +108,7 @@ function TabItem({ tab, isFocused, onPress, palette, styles }: TabItemProps) {
     outputRange: [0.5, 1],
   });
 
-  const activeColor = palette.gold;
+  const activeColor = palette.goldText;
   const inactiveColor = palette.textMuted;
 
   return (
@@ -115,7 +116,8 @@ function TabItem({ tab, isFocused, onPress, palette, styles }: TabItemProps) {
       onPress={onPress}
       activeOpacity={0.8}
       style={styles.tabItem}
-      accessibilityRole="button"
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isFocused }}
       accessibilityLabel={tab.label ?? tab.name}
     >
       <Animated.View

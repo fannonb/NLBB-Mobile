@@ -262,7 +262,9 @@ export default function App() {
   useEffect(() => {
     // Keep system UI (keyboard, alerts, date pickers) in step with the in-app theme
     // rather than the device setting; app.config uses userInterfaceStyle 'automatic'.
-    Appearance.setColorScheme(themeMode);
+    if (typeof Appearance.setColorScheme === 'function') {
+      Appearance.setColorScheme(themeMode);
+    }
   }, [themeMode]);
 
   const themeColors = useMemo(() => getThemeColors(themeMode), [themeMode]);

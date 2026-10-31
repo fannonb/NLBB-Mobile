@@ -17,6 +17,8 @@ const LIGHT_COLORS = {
 
   // Accent — exact NLBB logo gold
   gold: '#B8922A',
+  onGold: Brand.ink,
+  goldText: '#765B13',
   goldLight: '#D4AA1E',
   goldHover: '#C9A430',
   goldDim: 'rgba(184,146,42,0.1)',
@@ -54,6 +56,8 @@ const DARK_COLORS: ColorPalette = {
   card: '#11151C', // Slightly elevated from background
   cardInner: '#1A1F2B',
 
+  onGold: Brand.ink,
+  goldText: '#D4AF37',
   gold: '#D4AF37', // Brighter gold for dark mode contrast
   goldLight: '#E2C56B',
   goldHover: '#E8D081',
@@ -168,10 +172,9 @@ export const Shadow: ShadowPalette = {
 };
 
 export const applyThemeMode = (mode: ThemeMode) => {
-  // Enforce light theme only
-  Object.assign(Colors, ThemeColors['light']);
+  Object.assign(Colors, ThemeColors[mode]);
 
-  const nextShadow = ThemeShadows['light'];
+  const nextShadow = ThemeShadows[mode];
 
   try {
     Shadow.soft = { ...nextShadow.soft };

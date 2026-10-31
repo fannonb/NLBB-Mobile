@@ -5,6 +5,9 @@
 .expo-export-temp
 .expo-export-temp-2
 .gradle-home
+.gradle-user
+.dsh-acl-recovery
+tmp-signing
 .npm-cache
 .yarn-cache
 .tmp
@@ -15,6 +18,12 @@ node_modules
 android
 ios
 .env.local
+.env
+.env.*
+*.jks
+*.keystore
+*.p12
+*.key
 
 backend
 web

@@ -36,13 +36,13 @@ function createSectionHeaderStyles(p: ColorPalette) {
       paddingVertical: 3,
     },
     badgeText: {
-      color: p.bg,
+      color: p.onGold,
       fontFamily: Fonts.sansBold,
       fontSize: 11,
       fontWeight: '700',
     },
     seeAll: {
-      color: p.gold,
+      color: p.goldText,
       fontFamily: Fonts.sansMedium,
       fontSize: 12,
       letterSpacing: 0.2,
@@ -65,7 +65,7 @@ export default function SectionHeader({ title, onSeeAll, badge }: SectionHeaderP
         )}
       </View>
       {onSeeAll && (
-        <TouchableOpacity onPress={onSeeAll}>
+        <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel={`See all ${title.toLowerCase()}`} hitSlop={10}>
           <Text style={styles.seeAll}>See all</Text>
         </TouchableOpacity>
       )}

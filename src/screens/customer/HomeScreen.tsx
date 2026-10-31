@@ -6,9 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MAX_CONTENT_WIDTH } from '../../constants/layout';
 import { ColorPalette, Fonts, Radius, ShadowPalette, Spacing } from '../../constants/theme';
 import { useThemedColors, useThemedShadows } from '../../hooks/useThemedColors';
 import { useCurrentDeviceLocation } from '../../hooks/useCurrentDeviceLocation';
@@ -56,8 +58,8 @@ function createHomeStyles(palette: ColorPalette, _shadow: ShadowPalette) {
     // ── Greeting ──────────────────────────────────────────────
     greetingSection: {
       paddingHorizontal: 24,
-      paddingTop: 22,
-      paddingBottom: 24,
+      paddingTop: 16,
+      paddingBottom: 16,
       alignItems: 'center',
     },
     greetingText: {
@@ -81,7 +83,6 @@ function createHomeStyles(palette: ColorPalette, _shadow: ShadowPalette) {
     section: { marginBottom: Spacing.section },
     hScroll: { paddingHorizontal: 24, gap: 16, paddingBottom: 4 },
 
-    // ── Category 3×3 grid ─────────────────────────────────────
     catGrid: {
       paddingHorizontal: 24,
       marginBottom: Spacing.section,
@@ -95,6 +96,9 @@ function createHomeStyles(palette: ColorPalette, _shadow: ShadowPalette) {
       flex: 1,
     },
 
+    providerGrid: { paddingHorizontal: 24, flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+    noResultsHint: { color: palette.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+    noResultsAction: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
     // ── Book Again ────────────────────────────────────────────
     bookAgainScroll: { paddingHorizontal: 24, gap: 14, paddingBottom: 4 },
     bookAgainItem: { alignItems: 'center', width: 72 },
@@ -132,7 +136,7 @@ function createHomeStyles(palette: ColorPalette, _shadow: ShadowPalette) {
     // ── No Results ────────────────────────────────────────────
     noResults: { alignItems: 'center', paddingVertical: 32, gap: 8, paddingHorizontal: 24 },
     noResultsText: { color: palette.textMuted, fontFamily: Fonts.sansMedium, fontSize: 14 },
-    noResultsClear: { color: palette.gold, fontFamily: Fonts.sansMedium, fontSize: 13 },
+    noResultsClear: { color: palette.goldText, fontFamily: Fonts.sansMedium, fontSize: 13 },
 
     // ── Explore CTA card ──────────────────────────────────────
     padH: { paddingHorizontal: 24, marginBottom: Spacing.section },
@@ -176,7 +180,7 @@ function createHomeStyles(palette: ColorPalette, _shadow: ShadowPalette) {
     exploreCtaLabel: {
       fontSize: 10,
       fontFamily: Fonts.sansBold,
-      color: palette.gold,
+      color: palette.goldText,
       letterSpacing: 1,
     },
     exploreCtaTitle: {
@@ -201,7 +205,7 @@ function createHomeStyles(palette: ColorPalette, _shadow: ShadowPalette) {
       alignSelf: 'flex-start',
     },
     exploreCtaBtnText: {
-      color: '#FFFFFF',
+      color: palette.onGold,
       fontFamily: Fonts.sansBold,
       fontSize: 12,
     },
@@ -289,7 +293,7 @@ function createHomeStyles(palette: ColorPalette, _shadow: ShadowPalette) {
       borderColor: palette.gold,
     },
     favGuestBtnText: {
-      color: palette.gold,
+      color: palette.goldText,
       fontFamily: Fonts.sansBold,
       fontSize: 13,
     },
@@ -437,6 +441,11 @@ export default function HomeScreen({ navigation }: any) {
   const displayedCategories = useMemo(() => categories.slice(0, 9), [categories]);
   const catRows = useMemo(() => chunk(displayedCategories, 3), [displayedCategories]);
 
+  const { width } = useWindowDimensions();
+  const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
+  const useProviderGrid = contentWidth >= 600;
+  const providerColumnWidth = (contentWidth - 48 - 16) / 2;
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* ── Header ───────────────────────────────────────────── */}
@@ -569,9 +578,23 @@ export default function HomeScreen({ navigation }: any) {
             <View style={styles.noResults}>
               <Feather name="search" size={28} color={palette.border} />
               <Text style={styles.noResultsText}>No providers found</Text>
-              <TouchableOpacity onPress={() => { setSearch(''); setActiveCategory(null); }}>
-                <Text style={styles.noResultsClear}>Clear filters</Text>
+              <Text style={styles.noResultsHint}>Try another service, clear your search, or browse all providers.</Text>
+              {(search || activeCategory) ? (
+                <TouchableOpacity style={styles.noResultsAction} accessibilityRole="button" onPress={() => { setSearch(''); setActiveCategory(null); }}>
+                  <Text style={styles.noResultsClear}>Clear filters</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={styles.noResultsAction} accessibilityRole="button" onPress={() => navigation.navigate('Explore')}>
+                <Text style={styles.noResultsClear}>Browse all providers</Text>
               </TouchableOpacity>
+            </View>
+          ) : useProviderGrid ? (
+            <View style={styles.providerGrid}>
+              {filteredProviders.slice(0, 6).map((provider) => (
+                <ProviderCard key={provider.id} provider={provider} style={{ width: providerColumnWidth }}
+                  onPress={openProvider} onBookPress={openProvider} onFavoritePress={favoriteProvider}
+                  isFavorited={isLoggedIn && favorites.includes(provider.id)} />
+              ))}
             </View>
           ) : (
             <ScrollView

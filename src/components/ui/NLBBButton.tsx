@@ -32,6 +32,7 @@ function createButtonStyles(p: ColorPalette, s: ShadowPalette) {
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 24,
+      minHeight: 44,
     },
     primary: {
       backgroundColor: p.gold,
@@ -52,10 +53,10 @@ function createButtonStyles(p: ColorPalette, s: ShadowPalette) {
       textAlign: 'center',
     },
     labelPrimary: {
-      color: p.bg,
+      color: p.onGold,
     },
     labelSecondary: {
-      color: p.gold,
+      color: p.goldText,
     },
     labelGhost: {
       color: p.textSecondary,
@@ -84,7 +85,7 @@ export default function NLBBButton({
 
   const paddingVertical = size === 'sm' ? 10 : size === 'lg' ? 18 : 14;
   const fontSize = size === 'sm' ? 12 : size === 'lg' ? 16 : 14;
-  const spinnerColor = variant === 'primary' ? palette.bg : palette.gold;
+  const spinnerColor = variant === 'primary' ? palette.onGold : palette.goldText;
 
   const variantStyle =
     variant === 'secondary' ? styles.secondary : variant === 'ghost' ? styles.ghost : styles.primary;
@@ -142,6 +143,9 @@ export default function NLBBButton({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       disabled={disabled || loading}

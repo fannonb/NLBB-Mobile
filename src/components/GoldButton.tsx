@@ -33,7 +33,7 @@ function createGoldButtonStyles(p: ColorPalette, s: ShadowPalette) {
       ...s.gold,
     },
     label: {
-      color: p.bg,
+      color: p.onGold,
       fontFamily: Fonts.sansBold,
       fontWeight: '700',
       letterSpacing: 0.2,
@@ -63,6 +63,9 @@ export default function GoldButton({
   return (
     <TouchableOpacity
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       disabled={disabled || loading}
       activeOpacity={0.85}
       style={[
@@ -73,7 +76,7 @@ export default function GoldButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={palette.bg} size="small" />
+        <ActivityIndicator color={palette.onGold} size="small" />
       ) : (
         <Text
           style={[styles.label, { fontSize }, textStyle]}

@@ -124,7 +124,7 @@ function createHeaderStyles(p: ColorPalette) {
       borderRadius: 999,
       backgroundColor: p.gold,
     },
-    signInText: { color: p.bg, fontFamily: Fonts.sansBold, fontSize: 13 },
+    signInText: { color: p.onGold, fontFamily: Fonts.sansBold, fontSize: 13 },
     avatarBtn: {
       overflow: 'hidden',
     },

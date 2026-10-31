@@ -4,6 +4,8 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  StyleProp,
+  ViewStyle,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,6 +19,7 @@ import { Provider } from '../types';
 // Handlers receive the provider id so lists can pass one stable callback for every card,
 // which lets React.memo skip re-rendering cards whose data didn't change.
 interface ProviderCardProps {
+  style?: StyleProp<ViewStyle>;
   provider: Provider;
   onPress: (providerId: string) => void;
   onBookPress?: (providerId: string) => void;
@@ -50,9 +53,9 @@ function createProviderCardStyles(p: ColorPalette, s: ShadowPalette) {
       position: 'absolute',
       top: 12,
       right: 12,
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: 'rgba(18,18,18,0.55)',
       alignItems: 'center',
       justifyContent: 'center',
@@ -80,7 +83,7 @@ function createProviderCardStyles(p: ColorPalette, s: ShadowPalette) {
     },
     availText: {
       color: '#fff',
-      fontSize: 10,
+      fontSize: 12,
       fontFamily: Fonts.sansMedium,
     },
     ratingBadge: {
@@ -99,7 +102,7 @@ function createProviderCardStyles(p: ColorPalette, s: ShadowPalette) {
     },
     ratingText: {
       color: '#fff',
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: Fonts.sansBold,
     },
     info: {
@@ -151,7 +154,7 @@ function createProviderCardStyles(p: ColorPalette, s: ShadowPalette) {
       flexDirection: 'row',
       gap: 6,
       marginTop: 10,
-      flexWrap: 'nowrap',
+      flexWrap: 'wrap',
     },
     tag: {
       paddingHorizontal: 9,
@@ -163,7 +166,7 @@ function createProviderCardStyles(p: ColorPalette, s: ShadowPalette) {
     },
     tagText: {
       color: p.textSecondary,
-      fontSize: 10,
+      fontSize: 12,
       fontFamily: Fonts.sansMedium,
     },
     footer: {
@@ -177,7 +180,7 @@ function createProviderCardStyles(p: ColorPalette, s: ShadowPalette) {
     },
     priceLabel: {
       color: p.textMuted,
-      fontSize: 10,
+      fontSize: 12,
       fontFamily: Fonts.sans,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
@@ -190,13 +193,15 @@ function createProviderCardStyles(p: ColorPalette, s: ShadowPalette) {
       letterSpacing: -0.2,
     },
     bookBtn: {
+      minHeight: 44,
+      justifyContent: 'center',
       backgroundColor: p.gold,
       borderRadius: Radius.md,
       paddingHorizontal: 18,
       paddingVertical: 10,
     },
     bookText: {
-      color: p.bg,
+      color: p.onGold,
       fontFamily: Fonts.sansBold,
       fontSize: 12,
       fontWeight: '700',
@@ -211,6 +216,7 @@ function ProviderCard({
   onBookPress,
   onFavoritePress,
   isFavorited = false,
+  style,
 }: ProviderCardProps) {
   const palette = useThemedColors();
   const shadow = useThemedShadows();
@@ -223,7 +229,7 @@ function ProviderCard({
   const reviewLabel = formatRatingSummary(provider.rating, provider.reviewCount);
 
   return (
-    <TouchableOpacity onPress={() => onPress(provider.id)} activeOpacity={0.9} style={styles.card}>
+    <TouchableOpacity onPress={() => onPress(provider.id)} activeOpacity={0.9} style={[styles.card, style]}>
       <View style={styles.imageContainer}>
         <ProviderCoverImage uri={provider.coverImage} category={provider.category} style={styles.image} iconSize={40} />
 
@@ -242,6 +248,9 @@ function ProviderCard({
         <TouchableOpacity
           onPress={onFavoritePress ? () => onFavoritePress(provider.id) : undefined}
           style={styles.favBtn}
+          accessibilityRole="button"
+          accessibilityLabel={`${isFavorited ? 'Remove' : 'Save'} ${provider.name} ${isFavorited ? 'from' : 'to'} favourites`}
+          accessibilityState={{ selected: isFavorited }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Feather name="heart" size={14} color={isFavorited ? palette.gold : '#fff'} />
@@ -295,6 +304,8 @@ function ProviderCard({
           <TouchableOpacity
             onPress={onBookPress ? () => onBookPress(provider.id) : undefined}
             style={styles.bookBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Book ${provider.name}`}
             activeOpacity={0.85}
           >
             <Text style={styles.bookText}>Book</Text>

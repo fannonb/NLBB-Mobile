@@ -29,6 +29,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      EXPO_PUBLIC_API_BASE_URL: https://api.nlbb.co.ke/api
+      EXPO_PUBLIC_APP_ENV: production
+      EXPO_PUBLIC_ENABLE_DEMO_MODE: 'false'
+      EXPO_PUBLIC_ALLOW_SEEDED_IDENTITIES: 'false'
 
     steps:
       - name: Check required mobile build secrets
@@ -63,6 +68,7 @@ jobs:
           cat <<'EOF' > google-services.json
           ${{ secrets.GOOGLE_SERVICES_JSON }}
           EOF
+          node -e "const c=require('./google-services.json'); if (!c.client.some(x=>x.client_info.android_client_info.package_name==='ke.co.nlbb')) throw new Error('Firebase config must include ke.co.nlbb');"
           mkdir -p android/app
           cp google-services.json android/app/google-services.json
 

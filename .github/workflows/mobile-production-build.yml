@@ -70,6 +70,7 @@ jobs:
           cat <<'EOF' > google-services.json
           ${{ secrets.GOOGLE_SERVICES_JSON }}
           EOF
+          node -e "const c=require('./google-services.json'); if (!c.client.some(x=>x.client_info.android_client_info.package_name==='ke.co.nlbb')) throw new Error('Firebase config must include ke.co.nlbb');"
 
       - name: Typecheck mobile app
         run: npm run typecheck
