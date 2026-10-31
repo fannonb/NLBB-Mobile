@@ -15,8 +15,8 @@ tmp-signing
 .agents
 .claude
 node_modules
-android
-ios
+/android
+/ios
 .env.local
 .env
 .env.*

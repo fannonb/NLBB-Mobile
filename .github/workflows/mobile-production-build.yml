@@ -16,6 +16,7 @@ on:
       - main
     paths:
       - .github/workflows/mobile-production-build.yml
+      - .easignore
       - App.tsx
       - app.config.js
       - babel.config.js
